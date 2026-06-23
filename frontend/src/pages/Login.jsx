@@ -20,7 +20,7 @@ const Login = () => {
     if (redirect) return decodeURIComponent(redirect);
     if (u.role === 'admin') return '/admin?tab=dashboard';
     if (u.role === 'seller') return '/manage?tab=overview';
-    return '/user?tab=profile';
+    return '/';
   };
 
   const handleSubmit = async (e) => {
