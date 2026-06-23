@@ -865,7 +865,7 @@ function AppointmentsTab() {
     let mounted = true;
     setLoading(true);
     LocafyApi.getAppointments()
-      .then((data) => { if (mounted) setAppointments(data || []); })
+      .then((data) => { if (mounted) setAppointments(data.data || []); })
       .catch(console.error)
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };

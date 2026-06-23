@@ -1177,7 +1177,7 @@ const TabAppointments = () => {
     setLoading(true); setError(null);
     try {
       const data = await LocafyApi.getAppointments();
-      setAppts(data);
+      setAppts(data.data || []);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
