@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /manage/
+Disallow: /user/
+Disallow: /api/
+Disallow: /maintenance.html
+
+Sitemap: https://locafy.vn/sitemap.xml
