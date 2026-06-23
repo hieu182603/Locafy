@@ -163,34 +163,34 @@ const Home = () => {
           {/* Search box */}
           <form
             onSubmit={handleSearch}
-            className="bg-white p-3 sm:p-4 md:p-6 rounded-2xl shadow-2xl text-left"
+            className="bg-white p-4 sm:p-5 rounded-[24px] shadow-2xl border border-white/20 text-left max-w-4xl mx-auto"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <div className="min-w-0">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+            <div className="flex flex-col md:flex-row items-stretch md:items-end gap-4">
+              <div className="flex-grow min-w-0">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 ml-1">
                   Tìm kiếm
                 </label>
                 <div className="relative">
-                  <i className="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-gray-400" />
+                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Nhập từ khóa để tìm nhà..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nhập địa chỉ, tên đường hoặc từ khóa..."
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-2xl py-3 pl-11 pr-4 text-sm outline-none transition-all focus:ring-4 focus:ring-blue-500/10"
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+              <div className="w-full md:w-64 shrink-0">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 ml-1">
                   Khoảng giá
                 </label>
                 <div className="relative">
-                  <i className="fa-solid fa-tags absolute left-3 top-3.5 text-gray-400" />
+                  <i className="fa-solid fa-tags absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <select
                     value={priceFilter}
                     onChange={(e) => setPriceFilter(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 focus:bg-white rounded-2xl py-3 pl-11 pr-10 text-sm outline-none transition-all focus:ring-4 focus:ring-blue-500/10 appearance-none cursor-pointer"
                   >
                     <option value="all">Tất cả mức giá</option>
                     <option value="under-2">Dưới 2 triệu</option>
@@ -198,17 +198,18 @@ const Home = () => {
                     <option value="4-7">4 triệu - 7 triệu</option>
                     <option value="over-7">Trên 7 triệu</option>
                   </select>
+                  <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs" />
                 </div>
               </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition duration-200 shadow-md"
-              >
-                <i className="fa-solid fa-magnifying-glass" />
-                Tìm kiếm
-              </button>
+              <div className="shrink-0">
+                <button
+                  type="submit"
+                  className="w-full md:w-auto h-[46px] inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 rounded-2xl text-sm transition-all duration-200 shadow-lg shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+                >
+                  <i className="fa-solid fa-magnifying-glass" />
+                  Tìm kiếm
+                </button>
+              </div>
             </div>
           </form>
         </div>

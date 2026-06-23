@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,6 +7,21 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   const handleLogout = () => {
     logout();
@@ -57,7 +72,11 @@ const Navbar = () => {
               {user ? (
                 <>
                   <div className="flex items-center gap-3 px-1 py-2 mb-1">
-                    <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">{getInitials(user)}</div>
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.name} className="w-9 h-9 rounded-full object-cover shrink-0 shadow-sm" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">{getInitials(user)}</div>
+                    )}
                     <div>
                       <p className="text-sm font-bold text-gray-900">{user.name || user.username}</p>
                       <p className="text-xs text-gray-500">{user.email}</p>
@@ -102,12 +121,25 @@ const Navbar = () => {
                 </Link>
               )}
               
-              <div className="relative">
+              <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition shadow-md focus:outline-none"
+                  className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition duration-200 focus:outline-none cursor-pointer shadow-xs"
                 >
-                  {getInitials(user)}
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-full object-cover shrink-0 shadow-sm" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
+                      {getInitials(user)}
+                    </div>
+                  )}
+                  <div className="text-left select-none max-w-[120px]">
+                    <p className="text-xs font-bold text-gray-800 leading-tight truncate">{user.name || user.username}</p>
+                    <p className="text-[9px] text-gray-400 font-semibold leading-none uppercase tracking-wider mt-0.5">
+                      {user.role === 'admin' ? 'Admin' : user.role === 'seller' ? 'Chủ trọ' : 'Người thuê'}
+                    </p>
+                  </div>
+                  <i className={`fa-solid fa-chevron-down text-[10px] text-gray-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
                 {dropdownOpen && (
