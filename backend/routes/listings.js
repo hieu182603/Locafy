@@ -1,36 +1,84 @@
 const express = require('express');
 const router = express.Router();
-const { Listing } = require('../models');
+const { Listing, ViewHistory } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 
-// ── GET / – Public: danh sách listings đã duyệt ─────────────────────────────
+// authMiddleware tuỳ chọn – không throw lỗi nếu không có token
+function optionalAuth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return next();
+  authMiddleware(req, res, next);
+}
+
+// ── GET / – Public: danh sách listings đã duyệt (filter nâng cao) ────────────
+// Query: province, district, keyword, minPrice, maxPrice, minArea, maxArea,
+//        roomType, amenities (comma-sep), availableFrom,
+//        sortBy (price_asc|price_desc|newest|distance), page, limit
 router.get('/', async (req, res) => {
   try {
     const {
-      province, district, minPrice, maxPrice, roomType,
-      page = 1, limit = 20
+      province, district, keyword,
+      minPrice, maxPrice,
+      minArea, maxArea,
+      roomType, amenities, availableFrom,
+      sortBy = 'newest',
+      page = 1, limit = 20,
     } = req.query;
 
     const filter = { status: 'approved' };
-    if (province) filter.province = province;
-    if (district) filter.district = district;
-    if (roomType) filter.roomType = roomType;
+
+    if (province)  filter.province = province;
+    if (district)  filter.district = district;
+    if (roomType)  filter.roomType = roomType;
+
     if (minPrice || maxPrice) {
       filter.price = {};
       if (minPrice) filter.price.$gte = Number(minPrice);
       if (maxPrice) filter.price.$lte = Number(maxPrice);
     }
 
+    if (minArea || maxArea) {
+      filter.area = {};
+      if (minArea) filter.area.$gte = Number(minArea);
+      if (maxArea) filter.area.$lte = Number(maxArea);
+    }
+
+    if (keyword) {
+      filter.$or = [
+        { title: { $regex: keyword, $options: 'i' } },
+        { description: { $regex: keyword, $options: 'i' } },
+        { district: { $regex: keyword, $options: 'i' } },
+        { addressLine: { $regex: keyword, $options: 'i' } },
+      ];
+    }
+
+    if (amenities) {
+      const arr = amenities.split(',').map(a => a.trim()).filter(Boolean);
+      if (arr.length) filter.amenities = { $all: arr };
+    }
+
+    if (availableFrom) {
+      filter.availableFrom = { $lte: new Date(availableFrom) };
+    }
+
+    // Sort
+    const sortMap = {
+      price_asc:  { isPinned: -1, isBoosted: -1, price: 1 },
+      price_desc: { isPinned: -1, isBoosted: -1, price: -1 },
+      newest:     { isPinned: -1, isBoosted: -1, createdAt: -1 },
+    };
+    const sort = sortMap[sortBy] || sortMap.newest;
+
     const skip = (Number(page) - 1) * Number(limit);
     const [items, total] = await Promise.all([
       Listing.find(filter)
         .populate('room', 'name roomType area price amenities imageUrls')
         .populate('property', 'name addressLine ward district province')
-        .populate('seller', 'name avatarUrl phone')
-        .sort({ isPinned: -1, isBoosted: -1, createdAt: -1 })
+        .populate('seller', 'name avatarUrl')   // KHÔNG expose phone ở danh sách
+        .sort(sort)
         .skip(skip)
         .limit(Number(limit)),
-      Listing.countDocuments(filter)
+      Listing.countDocuments(filter),
     ]);
 
     res.status(200).json({
@@ -40,8 +88,8 @@ router.get('/', async (req, res) => {
         total,
         page: Number(page),
         limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit))
-      }
+        totalPages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error('GET /listings error:', error);
@@ -49,27 +97,76 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ── GET /:id – Public: chi tiết listing ─────────────────────────────────────
-router.get('/:id', async (req, res) => {
+// ── GET /:id – Chi tiết listing (ẩn SĐT & địa chỉ đầy đủ nếu chưa đăng nhập)
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id)
       .populate('room')
       .populate('property')
-      .populate('seller', 'name avatarUrl phone email isEmailVerified');
+      .populate('seller', 'name avatarUrl isEmailVerified');
+
     if (!listing) return res.status(404).json({ error: 'Không tìm thấy tin đăng.' });
+    if (listing.status !== 'approved') {
+      // Seller của tin hoặc Admin mới xem được
+      const userId = req.user?.id;
+      const role = req.user?.role;
+      const isSeller = role === 'seller' && String(listing.seller._id) === String(userId);
+      const isAdmin = role === 'admin';
+      if (!isSeller && !isAdmin) {
+        return res.status(403).json({ error: 'Tin đăng chưa được duyệt.' });
+      }
+    }
 
-    // Tăng lượt xem
-    listing.viewCount = (listing.viewCount || 0) + 1;
-    await listing.save();
+    // Tăng viewCount (fire-and-forget, không block response)
+    Listing.findByIdAndUpdate(listing._id, { $inc: { viewCount: 1 } }).exec();
 
-    res.status(200).json({ ok: true, data: listing });
+    // Loại bỏ thông tin nhạy cảm nếu Guest (chưa đăng nhập)
+    const isLoggedIn = !!req.user;
+    const data = listing.toObject();
+    if (!isLoggedIn) {
+      // Ẩn địa chỉ đầy đủ, giữ district/province
+      delete data.addressLine;
+      if (data.location) delete data.location;
+      if (data.property) {
+        delete data.property.addressLine;
+        delete data.property.location;
+      }
+    }
+
+    res.status(200).json({ ok: true, data, isContactVisible: isLoggedIn });
   } catch (error) {
     console.error('GET /listings/:id error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// ── POST / – Seller: tạo listing mới ────────────────────────────────────────
+// ── GET /:id/contact – User đã đăng nhập: lấy SĐT + địa chỉ đầy đủ ─────────
+router.get('/:id/contact', authMiddleware, async (req, res) => {
+  try {
+    const listing = await Listing.findById(req.params.id)
+      .select('seller addressLine location status')
+      .populate('seller', 'name phone email avatarUrl');
+
+    if (!listing) return res.status(404).json({ error: 'Không tìm thấy tin đăng.' });
+    if (listing.status !== 'approved') {
+      return res.status(403).json({ error: 'Tin đăng chưa được duyệt.' });
+    }
+
+    res.status(200).json({
+      ok: true,
+      data: {
+        seller: listing.seller,
+        addressLine: listing.addressLine,
+        location: listing.location,
+      },
+    });
+  } catch (error) {
+    console.error('GET /listings/:id/contact error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── POST / – Seller tạo listing ──────────────────────────────────────────────
 router.post('/', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'seller' && req.user.role !== 'admin') {
@@ -79,7 +176,7 @@ router.post('/', authMiddleware, async (req, res) => {
     const listing = new Listing({
       ...req.body,
       seller: req.user.id,
-      status: 'pending', // Luôn vào hàng chờ duyệt
+      status: 'pending',
     });
     await listing.save();
 
@@ -90,7 +187,7 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ── PATCH /:id – Seller: sửa nội dung listing ───────────────────────────────
+// ── PATCH /:id – Seller sửa nội dung listing ─────────────────────────────────
 router.patch('/:id', authMiddleware, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id);
@@ -102,18 +199,18 @@ router.patch('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Không có quyền chỉnh sửa tin đăng này.' });
     }
 
-    // Seller chỉ sửa nội dung, không đổi status/seller
-    const allowedFields = ['title', 'description', 'price', 'deposit', 'area', 'roomType',
-      'addressLine', 'ward', 'district', 'province', 'location', 'amenities',
-      'imageUrls', 'videoUrl', 'availableFrom'];
+    const allowedFields = [
+      'title', 'description', 'price', 'deposit', 'area', 'roomType',
+      'addressLine', 'ward', 'district', 'province', 'location',
+      'amenities', 'imageUrls', 'videoUrl', 'availableFrom',
+    ];
     const updates = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     }
 
-    // Sau khi seller sửa → về pending để duyệt lại
     if (isSeller && Object.keys(updates).length > 0) {
-      updates.status = 'pending';
+      updates.status = 'pending'; // Về pending để duyệt lại
     }
 
     const updated = await Listing.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true });
@@ -124,8 +221,8 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ── PATCH /:id/status – Admin: duyệt / từ chối listing ──────────────────────
-// Body: { status: 'approved' | 'rejected' | 'hidden', rejectedReason?: string }
+// ── PATCH /:id/status – Admin duyệt / từ chối / ẩn listing ──────────────────
+// Body: { status: 'approved'|'rejected'|'hidden'|'pending', rejectedReason? }
 router.patch('/:id/status', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -153,7 +250,7 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
-// ── DELETE /:id – Seller hoặc Admin xóa listing ─────────────────────────────
+// ── DELETE /:id – Seller / Admin xóa mềm listing ─────────────────────────────
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id);
@@ -165,13 +262,36 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Không có quyền xóa tin đăng này.' });
     }
 
-    // Xóa mềm: đổi status thành 'deleted'
     listing.status = 'deleted';
     await listing.save();
 
     res.status(200).json({ ok: true, message: 'Tin đăng đã được xóa.' });
   } catch (error) {
     console.error('DELETE /listings/:id error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── POST /:id/view – User ghi nhận lịch sử xem (auth optional) ───────────────
+router.post('/:id/view', optionalAuth, async (req, res) => {
+  try {
+    const listing = await Listing.findById(req.params.id).select('_id status');
+    if (!listing || listing.status !== 'approved') {
+      return res.status(404).json({ error: 'Không tìm thấy tin đăng.' });
+    }
+
+    if (req.user) {
+      // Upsert: ghi nhận lần xem, tăng viewCount
+      await ViewHistory.findOneAndUpdate(
+        { user: req.user.id, listing: req.params.id },
+        { $set: { viewedAt: new Date() }, $inc: { viewCount: 1 } },
+        { upsert: true, new: true }
+      );
+    }
+
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error('POST /listings/:id/view error:', error);
     res.status(500).json({ error: error.message });
   }
 });

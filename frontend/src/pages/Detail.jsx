@@ -181,6 +181,36 @@ const Detail = () => {
   // Geocode status
   const [mapStatusText, setMapStatusText] = useState('');
 
+  // Compare State
+  const [isCompared, setIsCompared] = useState(false);
+
+  // Initialize compared state
+  useEffect(() => {
+    try {
+      const compared = JSON.parse(localStorage.getItem('locafy_compare') || '[]');
+      setIsCompared(compared.includes(id));
+    } catch (_) { }
+  }, [id]);
+
+  const handleToggleCompare = () => {
+    try {
+      let compared = JSON.parse(localStorage.getItem('locafy_compare') || '[]');
+      if (compared.includes(id)) {
+        compared = compared.filter(x => x !== id);
+        setIsCompared(false);
+      } else {
+        if (compared.length >= 3) {
+          alert('Bạn chỉ có thể so sánh tối đa 3 phòng trọ cùng lúc.');
+          return;
+        }
+        compared.push(id);
+        setIsCompared(true);
+      }
+      localStorage.setItem('locafy_compare', JSON.stringify(compared));
+      window.dispatchEvent(new Event('storage'));
+    } catch (_) { }
+  };
+
   // ── Fetch listing ──────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchListing = async () => {
@@ -189,6 +219,10 @@ const Detail = () => {
         const data = await LocafyApi.getListing(id);
         setListing(data);
         setMapStatusText(`Vị trí: ${buildAddress(data)}`);
+
+        if (user && user.role === 'user') {
+          LocafyApi.recordListingView(id).catch(console.error);
+        }
 
         // Check favorite state from API if logged in
         if (user) {
@@ -246,9 +280,9 @@ const Detail = () => {
 
   const mapsUrl = listing?.location?.coordinates
     ? (() => {
-        const [lng, lat] = listing.location.coordinates;
-        return `https://www.google.com/maps/place/${encodeURIComponent(buildAddress(listing))}/@${lat},${lng},17z`;
-      })()
+      const [lng, lat] = listing.location.coordinates;
+      return `https://www.google.com/maps/place/${encodeURIComponent(buildAddress(listing))}/@${lat},${lng},17z`;
+    })()
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(buildAddress(listing ?? {}))}`;
 
   // ── Toggle Favorite ────────────────────────────────────────────────────────
@@ -308,7 +342,8 @@ const Detail = () => {
     setReportLoading(true);
     try {
       await LocafyApi.createReport({
-        listingId: listing._id,
+        entityType: 'listing',
+        entityId: listing._id,
         reason: reportReason,
         description: reportDesc,
       });
@@ -324,7 +359,7 @@ const Detail = () => {
   // ── Copy phone ────────────────────────────────────────────────────────────
   const handleCopyPhone = () => {
     const phone = listing?.seller?.phone || '';
-    navigator.clipboard.writeText(phone).then(() => alert(`Đã sao chép số: ${phone}`)).catch(() => {});
+    navigator.clipboard.writeText(phone).then(() => alert(`Đã sao chép số: ${phone}`)).catch(() => { });
   };
 
   // ── Loading / Error states ─────────────────────────────────────────────────
@@ -884,6 +919,18 @@ const Detail = () => {
                   {isFavorite ? 'Đã lưu vào yêu thích' : 'Lưu tin vào yêu thích'}
                 </button>
               )}
+
+              {/* Compare */}
+              <button
+                onClick={handleToggleCompare}
+                className={`w-full py-2.5 text-center text-xs font-bold rounded-xl border transition flex items-center justify-center gap-1.5 active:scale-[0.98] ${isCompared
+                    ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold'
+                    : 'bg-white hover:bg-stone-50 border-stone-200 text-stone-600'
+                  }`}
+              >
+                <i className={`fa-solid fa-scale-balanced ${isCompared ? 'text-blue-500' : 'text-stone-400'}`}></i>
+                {isCompared ? 'Đã thêm vào so sánh' : 'Thêm vào so sánh'}
+              </button>
 
               {/* Report */}
               <button

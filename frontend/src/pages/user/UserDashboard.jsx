@@ -43,20 +43,20 @@ function formatDateTime(iso) {
 // ─── Status badge config ─────────────────────────────────────────────────────
 
 const APPT_STATUS = {
-  pending:   { label: 'Chờ xác nhận',    cls: 'bg-amber-50 text-amber-700 border-amber-200',    icon: 'fa-hourglass-half' },
-  confirmed: { label: 'Đã xác nhận',     cls: 'bg-green-50 text-green-700 border-green-200',    icon: 'fa-circle-check' },
-  proposed:  { label: 'Đề xuất giờ mới', cls: 'bg-blue-50 text-blue-700 border-blue-200',       icon: 'fa-calendar-pen' },
-  cancelled: { label: 'Đã hủy',          cls: 'bg-red-50 text-red-500 border-red-200',          icon: 'fa-circle-xmark' },
-  completed: { label: 'Hoàn thành',      cls: 'bg-teal-50 text-teal-700 border-teal-200',       icon: 'fa-flag-checkered' },
-  no_show:   { label: 'Không đến',       cls: 'bg-stone-100 text-stone-500 border-stone-200',   icon: 'fa-user-xmark' },
+  pending: { label: 'Chờ xác nhận', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: 'fa-hourglass-half' },
+  confirmed: { label: 'Đã xác nhận', cls: 'bg-green-50 text-green-700 border-green-200', icon: 'fa-circle-check' },
+  proposed: { label: 'Đề xuất giờ mới', cls: 'bg-blue-50 text-blue-700 border-blue-200', icon: 'fa-calendar-pen' },
+  cancelled: { label: 'Đã hủy', cls: 'bg-red-50 text-red-500 border-red-200', icon: 'fa-circle-xmark' },
+  completed: { label: 'Hoàn thành', cls: 'bg-teal-50 text-teal-700 border-teal-200', icon: 'fa-flag-checkered' },
+  no_show: { label: 'Không đến', cls: 'bg-stone-100 text-stone-500 border-stone-200', icon: 'fa-user-xmark' },
 };
 
 const NOTIF_ICON = {
   appointment: { icon: 'fa-calendar-days', cls: 'bg-blue-100 text-blue-600' },
-  chat:        { icon: 'fa-comment-dots',  cls: 'bg-violet-100 text-violet-600' },
-  payment:     { icon: 'fa-wallet',        cls: 'bg-emerald-100 text-emerald-600' },
-  listing:     { icon: 'fa-house',         cls: 'bg-orange-100 text-orange-600' },
-  system:      { icon: 'fa-bell',          cls: 'bg-gray-100 text-gray-600' },
+  chat: { icon: 'fa-comment-dots', cls: 'bg-violet-100 text-violet-600' },
+  payment: { icon: 'fa-wallet', cls: 'bg-emerald-100 text-emerald-600' },
+  listing: { icon: 'fa-house', cls: 'bg-orange-100 text-orange-600' },
+  system: { icon: 'fa-bell', cls: 'bg-gray-100 text-gray-600' },
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -332,6 +332,525 @@ function ProfileTab({ user, updateUser }) {
   );
 }
 
+// ─── Tab: Preferences ──────────────────────────────────────────────────────────
+
+function PreferencesTab() {
+  const [preferences, setPreferences] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [school, setSchool] = useState('');
+  const [preferredArea, setPreferredArea] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [roomType, setRoomType] = useState('');
+  const [maxOccupants, setMaxOccupants] = useState('');
+  const [moveInDate, setMoveInDate] = useState('');
+  const [desiredAmenities, setDesiredAmenities] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const AMENITIES_LIST = [
+    { key: 'ac', label: 'Máy lạnh', icon: 'fa-wind' },
+    { key: 'wifi', label: 'Wifi Free', icon: 'fa-wifi' },
+    { key: 'parking', label: 'Chỗ để xe', icon: 'fa-square-parking' },
+    { key: 'washing_machine', label: 'Máy giặt', icon: 'fa-jug-detergent' },
+    { key: 'fridge', label: 'Tủ lạnh', icon: 'fa-snowflake' },
+    { key: 'water_heater', label: 'Nóng lạnh', icon: 'fa-fire' },
+    { key: 'balcony', label: 'Ban công', icon: 'fa-door-open' },
+    { key: 'elevator', label: 'Thang máy', icon: 'fa-elevator' },
+    { key: 'security', label: 'An ninh 24/7', icon: 'fa-shield-halved' },
+    { key: 'kitchen', label: 'Bếp nấu', icon: 'fa-utensils' },
+  ];
+
+  useEffect(() => {
+    let mounted = true;
+    LocafyApi.getUserPreferences()
+      .then((res) => {
+        if (mounted && res.ok && res.data) {
+          const d = res.data;
+          setPreferences(d);
+          setSchool(d.school || '');
+          setPreferredArea(d.preferredArea || '');
+          setMinPrice(d.minPrice || '');
+          setMaxPrice(d.maxPrice || '');
+          setRoomType(d.roomType || '');
+          setMaxOccupants(d.maxOccupants || '');
+          setMoveInDate(d.moveInDate ? d.moveInDate.split('T')[0] : '');
+          setDesiredAmenities(d.desiredAmenities || []);
+        }
+      })
+      .catch(console.error)
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  const handleToggleAmenity = (key) => {
+    setDesiredAmenities(prev =>
+      prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]
+    );
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        school: school || null,
+        preferredArea: preferredArea || null,
+        minPrice: minPrice ? Number(minPrice) : null,
+        maxPrice: maxPrice ? Number(maxPrice) : null,
+        roomType: roomType || null,
+        maxOccupants: maxOccupants ? Number(maxOccupants) : null,
+        moveInDate: moveInDate || null,
+        desiredAmenities
+      };
+      await LocafyApi.updateUserPreferences(payload);
+      setMsg({ type: 'success', text: 'Cập nhật nhu cầu tìm trọ thành công!' });
+      setTimeout(() => setMsg(null), 4000);
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message || 'Lưu thất bại.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-6">
+      <SectionTitle>Thiết lập nhu cầu tìm trọ</SectionTitle>
+
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+        <p className="text-xs text-gray-400 mb-6 leading-relaxed">
+          Chúng tôi sẽ sử dụng các thông tin này để lọc, gợi ý phòng trọ phù hợp nhất và tự động hóa tìm kiếm cho bạn (Fast Match).
+        </p>
+
+        <form onSubmit={handleSave} className="space-y-6">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Trường đại học của bạn</label>
+              <input
+                type="text"
+                value={school}
+                onChange={(e) => setSchool(e.target.value)}
+                placeholder="Ví dụ: Đại học FPT Hòa Lạc"
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Khu vực mong muốn</label>
+              <input
+                type="text"
+                value={preferredArea}
+                onChange={(e) => setPreferredArea(e.target.value)}
+                placeholder="Ví dụ: Khu Công nghệ cao, Thạch Hòa"
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Khoảng giá tối thiểu (VNĐ)</label>
+              <input
+                type="number"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                placeholder="Ví dụ: 1500000"
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Khoảng giá tối đa (VNĐ)</label>
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                placeholder="Ví dụ: 4000000"
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Loại phòng</label>
+              <select
+                value={roomType}
+                onChange={(e) => setRoomType(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              >
+                <option value="">Chọn loại phòng</option>
+                <option value="single">Phòng đơn</option>
+                <option value="shared">Ở ghép</option>
+                <option value="mini_apartment">Chung cư mini</option>
+                <option value="apartment">Căn hộ nguyên căn</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Số người ở dự kiến</label>
+              <input
+                type="number"
+                value={maxOccupants}
+                onChange={(e) => setMaxOccupants(e.target.value)}
+                placeholder="Ví dụ: 2"
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Ngày dự kiến dọn vào</label>
+              <input
+                type="date"
+                value={moveInDate}
+                onChange={(e) => setMoveInDate(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2.5">Tiện ích bắt buộc/mong muốn</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {AMENITIES_LIST.map((item) => {
+                const checked = desiredAmenities.includes(item.key);
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleToggleAmenity(item.key)}
+                    className={`flex items-center gap-2 px-3 py-2 border rounded-xl text-xs font-semibold text-left transition ${checked
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-blue-200 hover:bg-blue-50/20'
+                      }`}
+                  >
+                    <i className={`fa-solid ${item.icon} text-[10px] w-3.5 text-center ${checked ? 'text-blue-500' : 'text-gray-400'}`} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {msg && (
+            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold ${msg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+              <i className={`fa-solid ${msg.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}`} />
+              {msg.text}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-sm rounded-xl transition shadow-sm shadow-blue-200"
+          >
+            {saving ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Đang lưu...</> : <><i className="fa-solid fa-floppy-disk" /> Lưu cấu hình</>}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab: View History ─────────────────────────────────────────────────────────
+
+function ViewHistoryTab() {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    LocafyApi.getViewHistory()
+      .then((res) => {
+        if (mounted && res.ok) {
+          setHistory(res.data || []);
+        }
+      })
+      .catch(console.error)
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div>
+      <SectionTitle>Lịch sử phòng trọ đã xem</SectionTitle>
+
+      {history.length === 0 ? (
+        <EmptyState
+          icon="fa-clock-rotate-left"
+          title="Lịch sử xem trống"
+          subtitle="Bạn chưa click vào xem thông tin chi tiết phòng trọ nào."
+          action={
+            <Link to="/listings" className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow">
+              <i className="fa-solid fa-compass" /> Xem danh sách phòng
+            </Link>
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {history.map((item) => {
+            const l = item.listing;
+            return (
+              <div key={item._id} className="relative group">
+                <ListingCard listing={l} />
+                <span className="absolute bottom-3 right-3 z-10 px-2 py-0.5 bg-black/50 backdrop-blur-sm text-white text-[9px] font-bold rounded-md">
+                  Xem {timeAgo(item.viewedAt)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab: Billing & Transactions ──────────────────────────────────────────────
+
+function BillingTab() {
+  const [searchParams] = useSearchParams();
+  const paymentStatus = searchParams.get('paymentStatus');
+
+  const [packages, setPackages] = useState([]);
+  const [activeSub, setActiveSub] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [buyLoading, setBuyLoading] = useState(null); // package id
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [pkgsRes, subRes, txnsRes] = await Promise.all([
+        LocafyApi.getServicePackages().catch(() => ({ ok: false, data: [] })),
+        LocafyApi.getMySubscription().catch(() => ({ ok: false, data: null })),
+        LocafyApi.getMyTransactions().catch(() => ({ ok: false, data: [] }))
+      ]);
+
+      const renterPkgs = (pkgsRes.data || []).filter(p => p.targetRole === 'user' && p.isActive);
+      setPackages(renterPkgs);
+      setActiveSub(subRes.data || null);
+      setTransactions(txnsRes.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleBuy = async (pkg) => {
+    setBuyLoading(pkg._id);
+    try {
+      const res = await LocafyApi.buyPackage(pkg._id);
+      if (res.ok) {
+        if (res.checkoutUrl) {
+          window.location.href = res.checkoutUrl;
+        } else {
+          alert(res.message || 'Đăng ký thành công!');
+          fetchData();
+        }
+      }
+    } catch (err) {
+      alert(err.message || 'Lỗi xử lý giao dịch. Vui lòng thử lại.');
+    } finally {
+      setBuyLoading(null);
+    }
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <SectionTitle>Gói dịch vụ & Giao dịch</SectionTitle>
+        <p className="text-xs text-gray-400 -mt-4 leading-relaxed">
+          Nâng cấp tài khoản để có quyền lợi kết nối chủ trọ không giới hạn và nhận gợi ý phù hợp nhất.
+        </p>
+      </div>
+
+      {paymentStatus === 'success' && (
+        <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold">
+          <i className="fa-solid fa-circle-check text-emerald-500 mt-0.5 text-base" />
+          <div>
+            <p className="font-bold">Thanh toán thành công!</p>
+            <p className="mt-0.5 text-emerald-600">Giao dịch của bạn đã được cổng thanh toán xác nhận. Gói dịch vụ mới đã được kích hoạt thành công.</p>
+          </div>
+        </div>
+      )}
+
+      {paymentStatus === 'cancel' && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold">
+          <i className="fa-solid fa-circle-exclamation text-amber-500 mt-0.5 text-base" />
+          <div>
+            <p className="font-bold">Giao dịch đã hủy</p>
+            <p className="mt-0.5 text-amber-600">Bạn đã hủy giao dịch thanh toán hoặc giao dịch không hoàn tất.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Current Subscription Card */}
+      <div className="bg-gradient-to-br from-blue-700 to-indigo-900 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
+        <div className="absolute right-[-40px] top-[-40px] w-32 h-32 bg-white/5 rounded-full blur-2xl" />
+        <div className="absolute left-[-20px] bottom-[-20px] w-24 h-24 bg-white/5 rounded-full blur-xl" />
+
+        <div className="flex justify-between items-start">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest bg-white/25 px-2.5 py-1 rounded-full text-white/90">
+              Gói hiện tại
+            </span>
+            <h3 className="text-xl font-black mt-3">
+              {activeSub ? activeSub.servicePackage?.name : 'Locafy Renter Free'}
+            </h3>
+            <p className="text-xs text-blue-100 mt-1">
+              {activeSub
+                ? `Hạn dùng: ${new Date(activeSub.expiresAt).toLocaleDateString('vi-VN')}`
+                : 'Quyền lợi cơ bản của người tìm trọ.'}
+            </p>
+          </div>
+          <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 shrink-0">
+            <i className="fa-solid fa-crown text-xl text-yellow-300" />
+          </div>
+        </div>
+
+        <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <p className="text-blue-200">Liên hệ hàng ngày</p>
+            <p className="text-sm font-extrabold mt-1">
+              {activeSub?.servicePackage?.maxDailyContacts != null
+                ? `${activeSub.servicePackage.maxDailyContacts} lượt/ngày`
+                : 'Không giới hạn'}
+            </p>
+          </div>
+          <div>
+            <p className="text-blue-200">Tính năng nâng cao</p>
+            <p className="text-sm font-extrabold mt-1">
+              {activeSub?.servicePackage?.hasFastMatch ? 'Tìm kiếm Fast Match' : 'Cơ bản'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Available Packages */}
+      <div>
+        <h3 className="font-bold text-gray-900 text-sm mb-4">Các gói nâng cấp dịch vụ</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {packages.map((pkg) => {
+            const isActivePkg = activeSub && String(activeSub.servicePackage?._id) === String(pkg._id);
+            return (
+              <div
+                key={pkg._id}
+                className={`bg-white border rounded-2xl p-5 flex flex-col justify-between transition-all ${isActivePkg
+                    ? 'border-blue-600 ring-1 ring-blue-600 shadow-md shadow-blue-50'
+                    : 'border-gray-100 shadow-sm hover:border-blue-300 hover:shadow'
+                  }`}
+              >
+                <div>
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="font-extrabold text-gray-800 text-sm">{pkg.name}</h4>
+                    {isActivePkg && (
+                      <span className="bg-blue-100 text-blue-800 text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase">
+                        Đang dùng
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">{pkg.description || 'Nâng cấp quyền lợi tìm kiếm phòng trọ'}</p>
+
+                  <div className="my-4">
+                    <span className="text-xl font-black text-blue-600">
+                      {pkg.price === 0 ? 'Miễn phí' : pkg.price.toLocaleString('vi-VN') + ' đ'}
+                    </span>
+                    {pkg.price > 0 && <span className="text-[10px] text-gray-400"> / {pkg.durationDays} ngày</span>}
+                  </div>
+
+                  <ul className="space-y-2 text-[11px] text-gray-500 mb-5">
+                    {pkg.features.map((f, idx) => (
+                      <li key={idx} className="flex items-center gap-1.5">
+                        <i className="fa-solid fa-circle-check text-blue-500 text-[10px]" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => handleBuy(pkg)}
+                  disabled={buyLoading != null || isActivePkg}
+                  className={`w-full py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] ${isActivePkg
+                      ? 'bg-gray-100 text-gray-400 cursor-default shadow-none border border-gray-200'
+                      : pkg.price === 0
+                        ? 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                >
+                  {buyLoading === pkg._id ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : isActivePkg ? (
+                    'Gói đang kích hoạt'
+                  ) : pkg.price === 0 ? (
+                    'Kích hoạt miễn phí'
+                  ) : (
+                    'Nâng cấp ngay'
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Transaction History */}
+      <div>
+        <h3 className="font-bold text-gray-900 text-sm mb-4">Lịch sử thanh toán</h3>
+        {transactions.length === 0 ? (
+          <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl text-center text-xs text-gray-400">
+            Chưa có giao dịch thanh toán nào được thực hiện.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-gray-400 font-bold uppercase tracking-wider">
+                  <th className="py-3 px-4">Ngày giao dịch</th>
+                  <th className="py-3 px-4">Gói dịch vụ</th>
+                  <th className="py-3 px-4">Số tiền</th>
+                  <th className="py-3 px-4">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {transactions.map((t) => {
+                  const statusColors = {
+                    pending: 'bg-amber-50 text-amber-700 border-amber-100',
+                    success: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                    failed: 'bg-red-50 text-red-600 border-red-100',
+                    cancelled: 'bg-stone-100 text-stone-500 border-stone-100'
+                  }[t.status] || 'bg-gray-50 text-gray-500 border-gray-100';
+
+                  const statusLabels = {
+                    pending: 'Chờ thanh toán',
+                    success: 'Thành công',
+                    failed: 'Thất bại',
+                    cancelled: 'Đã hủy'
+                  }[t.status] || t.status;
+
+                  return (
+                    <tr key={t._id} className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 text-gray-500 font-medium">{new Date(t.createdAt).toLocaleString('vi-VN')}</td>
+                      <td className="py-3 px-4 font-bold text-gray-800">{t.servicePackage?.name || 'Gói dịch vụ'}</td>
+                      <td className="py-3 px-4 font-black text-gray-800">{t.amount.toLocaleString('vi-VN')} đ</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded-full font-bold border text-[10px] ${statusColors}`}>
+                          {statusLabels}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Tab: Appointments ───────────────────────────────────────────────────────
 
 function AppointmentsTab() {
@@ -385,11 +904,10 @@ function AppointmentsTab() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold border transition ${
-              filter === f
+            className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold border transition ${filter === f
                 ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'
-            }`}
+              }`}
           >
             {FILTER_LABELS[f]}
           </button>
@@ -658,11 +1176,10 @@ function NotificationsTab() {
           <button
             key={val}
             onClick={() => setFilter(val)}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold border transition ${
-              filter === val
+            className={`px-4 py-1.5 rounded-full text-xs font-bold border transition ${filter === val
                 ? 'bg-blue-600 text-white border-blue-600'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'
-            }`}
+              }`}
           >
             {label}
             {val === 'unread' && unreadCount > 0 && (
@@ -688,11 +1205,10 @@ function NotificationsTab() {
               <div
                 key={n._id}
                 onClick={() => !n.isRead && handleMarkRead(n._id)}
-                className={`flex items-start gap-4 p-4 rounded-2xl border transition cursor-pointer group ${
-                  n.isRead
+                className={`flex items-start gap-4 p-4 rounded-2xl border transition cursor-pointer group ${n.isRead
                     ? 'bg-white border-gray-100 hover:bg-gray-50'
                     : 'bg-blue-50/50 border-blue-100 hover:bg-blue-50 shadow-sm'
-                }`}
+                  }`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cfg.cls}`}>
                   <i className={`fa-solid ${cfg.icon} text-sm`} />
@@ -746,7 +1262,7 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
       const found = conversations.find((c) => c._id === initialChatId);
       if (found) selectConversation(found);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialChatId, conversations]);
 
   const selectConversation = useCallback(async (conv) => {
@@ -946,11 +1462,10 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
                             </div>
                           )}
                           <div className={`max-w-[70%] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
-                            <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
-                              mine
+                            <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${mine
                                 ? 'bg-blue-600 text-white rounded-br-md'
                                 : 'bg-white text-gray-800 border border-gray-100 shadow-sm rounded-bl-md'
-                            }`}>
+                              }`}>
                               {msg.text}
                             </div>
                             <span className={`text-[10px] mt-1 ${mine ? 'text-gray-400 text-right' : 'text-gray-400'}`}>
@@ -1004,11 +1519,10 @@ function NavItem({ tab, current, icon, label, badge, onClick }) {
   return (
     <button
       onClick={() => onClick(tab)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all text-left ${
-        active
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all text-left ${active
           ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-      }`}
+        }`}
     >
       <i className={`fa-solid ${icon} w-4 text-center text-base`} />
       <span className="flex-grow">{label}</span>
@@ -1039,7 +1553,7 @@ const UserDashboard = () => {
         const unread = (data || []).filter((n) => !n.isRead).length;
         setUnreadNotifCount(unread);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [user, currentTab]);
 
   const goTab = (tab) => {
@@ -1050,73 +1564,129 @@ const UserDashboard = () => {
     setSearchParams({ tab: 'chats', chatId });
   };
 
-  const NAV_ITEMS = [
-    { tab: 'profile',       icon: 'fa-user',           label: 'Tài khoản của tôi' },
-    { tab: 'appointments',  icon: 'fa-calendar-check', label: 'Lịch hẹn xem phòng' },
-    { tab: 'favorites',     icon: 'fa-heart',          label: 'Tin đã lưu' },
-    { tab: 'notifications', icon: 'fa-bell',           label: 'Thông báo',          badge: unreadNotifCount },
-    { tab: 'chats',         icon: 'fa-comment-dots',   label: 'Hộp thư' },
+  const NAV_GROUPS = [
+    {
+      title: 'Tài khoản',
+      items: [
+        { tab: 'profile', icon: 'fa-user', label: 'Tài khoản của tôi' },
+        { tab: 'preferences', icon: 'fa-sliders', label: 'Nhu cầu tìm trọ' },
+      ]
+    },
+    {
+      title: 'Hoạt động',
+      items: [
+        { tab: 'appointments', icon: 'fa-calendar-check', label: 'Lịch hẹn xem phòng' },
+        { tab: 'favorites', icon: 'fa-heart', label: 'Tin đã lưu' },
+        { tab: 'history', icon: 'fa-clock-rotate-left', label: 'Lịch sử đã xem' },
+      ]
+    },
+    {
+      title: 'Tương tác',
+      items: [
+        { tab: 'notifications', icon: 'fa-bell', label: 'Thông báo', badge: unreadNotifCount },
+        { tab: 'chats', icon: 'fa-comment-dots', label: 'Hộp thư' },
+        { tab: 'billing', icon: 'fa-credit-card', label: 'Gói dịch vụ & Giao dịch' },
+      ]
+    }
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="w-full h-screen overflow-hidden flex bg-gray-50" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
+      {/* ── Sidebar ── */}
+      <aside className="w-64 border-r border-gray-150 bg-white flex flex-col justify-between shrink-0 h-full p-5">
+        <div className="flex flex-col flex-grow overflow-hidden">
+          {/* Brand Logo & Title */}
+          <div className="flex items-center gap-2.5 px-3 py-4 mb-4 border-b border-gray-50 shrink-0">
+            <Link to="/" className="flex items-center gap-2.5 text-blue-700 hover:opacity-90 transition">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold shadow-sm shadow-blue-500/10">
+                <i className="fa-solid fa-house-chimney text-base" />
+              </div>
+              <div>
+                <span className="font-extrabold text-base tracking-tight text-gray-900 leading-none block">Locafy</span>
+                <span className="text-[10px] block font-bold text-blue-600 uppercase tracking-wider mt-0.5">Kênh Người Thuê</span>
+              </div>
+            </Link>
+          </div>
 
-        {/* Page header */}
-        <div className="mb-7">
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 mb-1">Trang cá nhân</p>
-          <h1 className="text-2xl font-extrabold text-gray-900">
-            Xin chào, {user?.name || 'bạn'} 👋
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5">Quản lý tài khoản và hoạt động của bạn trên Locafy</p>
+          {/* Categorized Navigation items */}
+          <nav className="flex-1 space-y-5 overflow-y-auto px-1">
+            {NAV_GROUPS.map((group, groupIdx) => (
+              <div key={groupIdx} className="space-y-1">
+                <p className="px-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">{group.title}</p>
+                <div className="space-y-0.5">
+                  {group.items.map(item => {
+                    const isActive = currentTab === item.tab;
+                    return (
+                      <button
+                        key={item.tab}
+                        onClick={() => goTab(item.tab)}
+                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer border-0 ${isActive
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 active:scale-[0.98]'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-blue-700'
+                          }`}
+                      >
+                        <i className={`fa-solid ${item.icon} w-4 text-center text-sm`} />
+                        <span className="flex-grow">{item.label}</span>
+                        {item.badge > 0 && (
+                          <span className={`text-[10px] font-black min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 ${isActive ? 'bg-white/20 text-white' : 'bg-red-500 text-white'}`}>
+                            {item.badge > 99 ? '99+' : item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
         </div>
 
-        <div className="grid md:grid-cols-[240px_1fr] gap-7 items-start">
-
-          {/* ── Sidebar ── */}
-          <aside className="md:sticky md:top-24 space-y-1">
-            {/* User avatar card */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3 flex items-center gap-3">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.name} className="w-11 h-11 rounded-xl object-cover shrink-0 shadow-sm" />
-              ) : (
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-sm">
-                  {getInitials(user?.name)}
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className="font-bold text-gray-900 text-sm truncate">{user?.name || '—'}</p>
-                <p className="text-[11px] text-gray-400 truncate">{user?.email}</p>
+        {/* Sidebar Bottom Profile/Actions */}
+        <div className="pt-4 border-t border-gray-150 space-y-2 mt-auto shrink-0">
+          {/* User profile row */}
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-lg object-cover shrink-0 shadow-sm" />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                {getInitials(user?.name)}
               </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-gray-900 text-xs truncate leading-tight">{user?.name || '—'}</p>
+              <p className="text-[9px] text-gray-400 truncate mt-0.5 leading-none">{user?.email}</p>
             </div>
+          </div>
 
-            {/* Nav items */}
-            <nav className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 space-y-0.5">
-              {NAV_ITEMS.map((item) => (
-                <NavItem
-                  key={item.tab}
-                  {...item}
-                  current={currentTab}
-                  onClick={goTab}
-                />
-              ))}
-            </nav>
+          {/* Quick Find Room Link */}
+          <Link
+            to="/listings"
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all text-center border border-blue-100"
+          >
+            <i className="fa-solid fa-magnifying-glass text-[10px]" /> Tìm phòng trọ
+          </Link>
+        </div>
+      </aside>
 
-            {/* Quick link */}
-            <Link
-              to="/listings"
-              className="mt-3 flex items-center gap-2.5 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-700 rounded-xl text-xs font-bold transition"
-            >
-              <i className="fa-solid fa-magnifying-glass" />
-              Tìm phòng trọ
-            </Link>
-          </aside>
+      {/* ── Main content area ── */}
+      <div className="flex-grow h-full flex flex-col min-w-0">
+        <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-gray-50/50">
+          {/* Page header */}
+          <div className="mb-6 flex justify-between items-center">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 mb-1">Trang cá nhân</p>
+              <h1 className="text-xl font-extrabold text-gray-900">
+                Xin chào, {user?.name || 'bạn'} 👋
+              </h1>
+            </div>
+          </div>
 
-          {/* ── Tab panel ── */}
-          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 min-h-[480px]">
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-premium-md p-6 md:p-8 min-h-[480px]">
             {currentTab === 'profile' && <ProfileTab user={user} updateUser={updateUser} />}
+            {currentTab === 'preferences' && <PreferencesTab />}
             {currentTab === 'appointments' && <AppointmentsTab />}
             {currentTab === 'favorites' && <FavoritesTab />}
+            {currentTab === 'history' && <ViewHistoryTab />}
             {currentTab === 'notifications' && <NotificationsTab />}
             {currentTab === 'chats' && (
               <ChatsTab
@@ -1125,9 +1695,9 @@ const UserDashboard = () => {
                 onChatChange={handleChatChange}
               />
             )}
+            {currentTab === 'billing' && <BillingTab />}
           </section>
-
-        </div>
+        </main>
       </div>
     </div>
   );

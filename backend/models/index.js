@@ -23,6 +23,9 @@ module.exports = {
   ViewHistory:    require('./ViewHistory'),
   SavedSearch:    require('./SavedSearch'),
   Otp:            require('./Otp'),
+  Banner:         require('./Banner'),
+  Article:        require('./Article'),
+  Coupon:         require('./Coupon'),
 };
 
 
