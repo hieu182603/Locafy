@@ -31,8 +31,7 @@ backend/.env
 frontend/.env
 
 # Local agent config
-.claude/
-.agent/
+
 
 # IDEs and Editors
 .vscode/
