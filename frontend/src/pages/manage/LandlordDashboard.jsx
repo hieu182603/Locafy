@@ -1089,7 +1089,7 @@ const LandlordDashboard = () => {
                       <button
                         key={tab.id}
                         onClick={() => goTab(tab.id)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13.5px] font-bold transition-all text-left cursor-pointer border-0 ${isActive
+                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer border-0 ${isActive
                             ? 'bg-seller-600 text-white shadow-premium-md shadow-seller-500/20 active:scale-[0.98]'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-seller-700'
                           }`}
@@ -1131,7 +1131,7 @@ const LandlordDashboard = () => {
               logout();
               navigate('/');
             }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-[13.5px] font-bold transition-all text-center cursor-pointer bg-white"
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-all text-center cursor-pointer bg-white"
           >
             <i className="fa-solid fa-right-from-bracket text-[10px]" /> Đăng xuất
           </button>
