@@ -6,4 +6,4 @@ Disallow: /user/
 Disallow: /api/
 Disallow: /maintenance.html
 
-Sitemap: https://locafy.vn/sitemap.xml
+Sitemap: https://locafys.vercel.app/sitemap.xml
