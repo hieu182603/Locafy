@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import GoogleAnalytics from './components/GoogleAnalytics';
 
 // Import Layout Components
 import Navbar from './components/Navbar';
@@ -99,6 +100,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <GoogleAnalytics />
         <AppContent />
       </AuthProvider>
     </Router>
