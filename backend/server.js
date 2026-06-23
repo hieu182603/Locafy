@@ -140,7 +140,7 @@ io.on('connection', (socket) => {
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
-if (process.env.NODE_ENV !== 'production') {
+if (require.main === module || process.env.NODE_ENV !== 'production') {
   server.listen(PORT, () => {
     console.log(`Locafy Express API Server running on port ${PORT}`);
   });
