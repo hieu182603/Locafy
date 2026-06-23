@@ -163,6 +163,7 @@ const NAV_ITEMS = [
   { key: 'users',         icon: 'fa-solid fa-users',               label: 'Quản lý Người dùng' },
   { key: 'reports',       icon: 'fa-solid fa-flag',                label: 'Báo cáo Vi phạm' },
   { key: 'appointments',  icon: 'fa-solid fa-calendar-check',      label: 'Theo dõi Lịch hẹn' },
+  { key: 'packages',      icon: 'fa-solid fa-crown',               label: 'Gói Dịch vụ' },
   { key: 'content',       icon: 'fa-solid fa-newspaper',           label: 'Quản lý Nội dung' },
   { key: 'settings',      icon: 'fa-solid fa-gear',                label: 'Cài đặt Hệ thống' },
 ];
@@ -181,24 +182,12 @@ const TabDashboard = () => {
     setLoading(true);
     setError(null);
     try {
-      const [accounts, listings, appointments] = await Promise.all([
-        LocafyApi.getAdminAccounts(),
-        LocafyApi.getListings(),
-        LocafyApi.getAppointments().catch(() => []),
+      const [dashRes, listingsRes] = await Promise.all([
+        LocafyApi.getAdminDashboard(),
+        LocafyApi.getAdminListings({ status: 'pending', limit: 6 }),
       ]);
-      const sellers   = accounts.filter(a => a.role === 'seller');
-      const buyers    = accounts.filter(a => a.role === 'buyer');
-      const pending   = listings.filter(l => l.status === 'pending' || (!l.censored && l.status !== 'rejected'));
-      setStats({
-        totalUsers: accounts.length,
-        totalSellers: sellers.length,
-        totalListings: listings.length,
-        totalAppts: appointments.length,
-        pendingSellers: sellers.filter(s => (s.verificationStatus || 'pending') === 'pending').length,
-        pendingListings: pending.length,
-        totalBuyers: buyers.length,
-      });
-      setPendingListings(pending.slice(0, 6));
+      setStats(dashRes.data);
+      setPendingListings(listingsRes.data || []);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -212,10 +201,10 @@ const TabDashboard = () => {
   if (error) return <ErrorState message={error} onRetry={load} />;
 
   const STAT_CARDS = [
-    { label: 'Tổng người dùng',   value: stats.totalUsers,    icon: 'fa-users',           color: 'purple' },
-    { label: 'Tổng chủ trọ',      value: stats.totalSellers,  icon: 'fa-user-tie',         color: 'amber' },
-    { label: 'Tổng tin đăng',      value: stats.totalListings, icon: 'fa-house',            color: 'blue' },
-    { label: 'Tổng lịch hẹn',      value: stats.totalAppts,    icon: 'fa-calendar-check',   color: 'green' },
+    { label: 'Tổng người dùng',     value: stats.accounts.totalUsers,                        icon: 'fa-users',       color: 'purple' },
+    { label: 'Tổng chủ trọ',        value: stats.accounts.totalSellers,                      icon: 'fa-user-tie',    color: 'amber' },
+    { label: 'Tin đăng đã duyệt',   value: stats.listings.approved,                          icon: 'fa-house',       color: 'blue' },
+    { label: 'Doanh thu tháng này', value: fmtPrice(stats.transactions.revenueThisMonth),    icon: 'fa-wallet',      color: 'green' },
   ];
   const colorMap = {
     purple: 'bg-purple-50 text-purple-600 border-purple-100',
@@ -259,9 +248,9 @@ const TabDashboard = () => {
       </div>
 
       {/* Pending alerts */}
-      {(stats.pendingSellers > 0 || stats.pendingListings > 0) && (
+      {(stats.accounts.pendingSellers > 0 || stats.listings.pending > 0) && (
         <div className="grid sm:grid-cols-2 gap-4">
-          {stats.pendingSellers > 0 && (
+          {stats.accounts.pendingSellers > 0 && (
             <button
               onClick={() => setSearchParams({ tab: 'verify-sellers' })}
               className="flex items-center gap-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl hover:bg-amber-100 transition-colors text-left"
@@ -270,12 +259,12 @@ const TabDashboard = () => {
                 <i className="fa-solid fa-user-clock text-sm" />
               </div>
               <div>
-                <p className="text-sm font-bold text-amber-900">{stats.pendingSellers} chủ trọ chờ duyệt hồ sơ</p>
+                <p className="text-sm font-bold text-amber-900">{stats.accounts.pendingSellers} chủ trọ chờ duyệt hồ sơ</p>
                 <p className="text-xs text-amber-700 mt-0.5">Nhấn để xét duyệt ngay →</p>
               </div>
             </button>
           )}
-          {stats.pendingListings > 0 && (
+          {stats.listings.pending > 0 && (
             <button
               onClick={() => setSearchParams({ tab: 'listings' })}
               className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 transition-colors text-left"
@@ -284,7 +273,7 @@ const TabDashboard = () => {
                 <i className="fa-solid fa-bed text-sm" />
               </div>
               <div>
-                <p className="text-sm font-bold text-blue-900">{stats.pendingListings} tin đăng chờ kiểm duyệt</p>
+                <p className="text-sm font-bold text-blue-900">{stats.listings.pending} tin đăng chờ kiểm duyệt</p>
                 <p className="text-xs text-blue-700 mt-0.5">Nhấn để kiểm duyệt ngay →</p>
               </div>
             </button>
@@ -333,7 +322,7 @@ const TabDashboard = () => {
           <div className="flex justify-between items-center px-6 py-4 border-b border-stone-100">
             <h3 className="text-base font-extrabold text-stone-900">Danh sách chờ duyệt (Tin đăng mới)</h3>
             <span className="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 px-3 py-1 rounded-full">
-              Có {stats.pendingListings} tin chờ duyệt
+              Có {stats.listings.pending} tin chờ duyệt
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -352,15 +341,15 @@ const TabDashboard = () => {
                     <td className="py-3 px-6">
                       <div className="flex items-center gap-3">
                         <img
-                          src={item.images?.[0] || item.image || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=100&q=80'}
+                          src={item.imageUrls?.[0] || item.room?.imageUrls?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=100&q=80'}
                           alt=""
                           className="w-10 h-10 rounded-lg object-cover shrink-0"
                         />
                         <span className="font-bold text-stone-900 line-clamp-1">{item.title}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-6 text-stone-600">@{item.ownerUsername || '—'}</td>
-                    <td className="py-3 px-6 text-stone-500 text-xs">{item.location || item.address || '—'}</td>
+                    <td className="py-3 px-6 text-stone-600">{item.seller?.name || '—'}</td>
+                    <td className="py-3 px-6 text-stone-500 text-xs">{item.district ? `${item.district}, ${item.province}` : (item.addressLine || '—')}</td>
                     <td className="py-3 px-6 font-bold text-purple-700">{fmtPrice(item.price)}</td>
                   </tr>
                 ))}
@@ -442,8 +431,8 @@ const TabVerifySellers = () => {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const accounts = await LocafyApi.getAdminAccounts();
-      setSellers(accounts.filter(a => a.role === 'seller'));
+      const res = await LocafyApi.getAdminAccounts({ role: 'seller', limit: 100 });
+      setSellers(res.data || []);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
@@ -453,7 +442,7 @@ const TabVerifySellers = () => {
   const handleVerify = async (seller, status, rejectedReason = '') => {
     setProcessing(seller._id || seller.id);
     try {
-      await LocafyApi.verifySeller(seller._id || seller.id, { verificationStatus: status, verificationRejectedReason: rejectedReason });
+      await LocafyApi.verifySeller(seller._id || seller.id, { status, rejectedReason });
       setSellers(prev => prev.map(s =>
         (s._id || s.id) === (seller._id || seller.id)
           ? { ...s, verificationStatus: status, verificationRejectedReason: rejectedReason }
@@ -683,8 +672,8 @@ const TabListings = () => {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const data = await LocafyApi.getListings();
-      setListings(data);
+      const res = await LocafyApi.getAdminListings({ limit: 100 });
+      setListings(res.data || []);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
@@ -785,18 +774,18 @@ const TabListings = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <img
-                          src={item.images?.[0] || item.image || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=100&q=80'}
+                          src={item.imageUrls?.[0] || item.room?.imageUrls?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=100&q=80'}
                           alt=""
                           className="w-12 h-12 rounded-xl object-cover shrink-0"
                         />
                         <div>
                           <p className="font-bold text-stone-900 line-clamp-1">{item.title}</p>
-                          <p className="text-xs text-stone-400">{item.roomType || item.category || '—'}</p>
+                          <p className="text-xs text-stone-400">{item.roomType || '—'}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-stone-600 text-xs max-w-[160px] line-clamp-2">{item.location || item.address || '—'}</td>
-                    <td className="py-4 px-6 text-stone-500">@{item.ownerUsername || '—'}</td>
+                    <td className="py-4 px-6 text-stone-600 text-xs max-w-[160px] line-clamp-2">{item.district ? `${item.district}, ${item.province}` : (item.addressLine || '—')}</td>
+                    <td className="py-4 px-6 text-stone-500">{item.seller?.name || '—'}</td>
                     <td className="py-4 px-6 font-bold text-purple-700">{fmtPrice(item.price)}</td>
                     <td className="py-4 px-6">
                       <StatusBadge status={status} map={LISTING_STATUS_MAP} />
@@ -875,8 +864,8 @@ const TabUsers = () => {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const data = await LocafyApi.getAdminAccounts();
-      setUsers(data);
+      const res = await LocafyApi.getAdminAccounts({ limit: 200 });
+      setUsers(res.data || []);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
@@ -889,7 +878,7 @@ const TabUsers = () => {
     try {
       await LocafyApi.toggleAccountActive(id);
       setUsers(prev => prev.map(u =>
-        (u._id || u.id) === id ? { ...u, isBlocked: !u.isBlocked } : u
+        (u._id || u.id) === id ? { ...u, isActive: !u.isActive } : u
       ));
     } catch (e) { alert('Thao tác thất bại: ' + e.message); }
     finally { setProcessing(null); }
@@ -904,8 +893,8 @@ const TabUsers = () => {
       (u.phone || '').includes(q);
     const matchRole   = roleFilter === 'all'   || u.role === roleFilter;
     const matchStatus = statusFilter === 'all' ||
-      (statusFilter === 'active' && !u.isBlocked) ||
-      (statusFilter === 'blocked' && u.isBlocked);
+      (statusFilter === 'active' && u.isActive !== false) ||
+      (statusFilter === 'blocked' && u.isActive === false);
     return matchSearch && matchRole && matchStatus;
   });
 
@@ -922,13 +911,13 @@ const TabUsers = () => {
     <div className="space-y-6">
       {confirmTarget && (
         <ConfirmModal
-          title={confirmTarget.isBlocked ? 'Mở khóa tài khoản?' : 'Khóa tài khoản?'}
-          message={confirmTarget.isBlocked
-            ? `Tài khoản "${confirmTarget.username}" sẽ được mở khóa và hoạt động trở lại.`
-            : `Tài khoản "${confirmTarget.username}" sẽ bị khóa và không thể đăng nhập.`
+          title={confirmTarget.isActive === false ? 'Mở khóa tài khoản?' : 'Khóa tài khoản?'}
+          message={confirmTarget.isActive === false
+            ? `Tài khoản "${confirmTarget.name || confirmTarget.email}" sẽ được mở khóa và hoạt động trở lại.`
+            : `Tài khoản "${confirmTarget.name || confirmTarget.email}" sẽ bị khóa và không thể đăng nhập.`
           }
-          confirmLabel={confirmTarget.isBlocked ? 'Mở khóa' : 'Khóa'}
-          confirmCls={confirmTarget.isBlocked ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+          confirmLabel={confirmTarget.isActive === false ? 'Mở khóa' : 'Khóa'}
+          confirmCls={confirmTarget.isActive === false ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
           onConfirm={() => { doToggle(confirmTarget); setConfirmTarget(null); }}
           onClose={() => setConfirmTarget(null)}
         />
@@ -988,8 +977,8 @@ const TabUsers = () => {
                 </tr>
               ) : filtered.map(u => {
                 const id = u._id || u.id;
-                const isSelf    = u.username === currentUser?.username;
-                const isBlocked = u.isBlocked || false;
+                const isSelf    = String(u._id || u.id) === String(currentUser?._id || currentUser?.id);
+                const isBlocked = u.isActive === false;
                 const role      = roleMap[u.role] || { label: u.role, cls: 'bg-stone-100 text-stone-700' };
                 return (
                   <tr key={id} className="hover:bg-stone-50/50">
@@ -1059,8 +1048,8 @@ const TabReports = () => {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const data = await LocafyApi.getAdminReports();
-      setReports(data);
+      const res = await LocafyApi.getAdminReports({ limit: 100 });
+      setReports(res.data || []);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
@@ -1071,10 +1060,7 @@ const TabReports = () => {
     const id = report._id || report.id;
     setProcessing(id);
     try {
-      // API call if available, else optimistic
-      if (LocafyApi.resolveReport) {
-        await LocafyApi.resolveReport(id);
-      }
+      await LocafyApi.resolveReport(id, { status: 'resolved' });
       setReports(prev => prev.map(r => (r._id || r.id) === id ? { ...r, status: 'resolved' } : r));
     } catch (e) { alert('Thao tác thất bại: ' + e.message); }
     finally { setProcessing(null); }
@@ -1084,10 +1070,8 @@ const TabReports = () => {
     const id = report._id || report.id;
     setProcessing(id);
     try {
-      if (LocafyApi.dismissReport) {
-        await LocafyApi.dismissReport(id);
-      }
-      setReports(prev => prev.filter(r => (r._id || r.id) !== id));
+      await LocafyApi.resolveReport(id, { status: 'dismissed' });
+      setReports(prev => prev.map(r => (r._id || r.id) === id ? { ...r, status: 'dismissed' } : r));
     } catch (e) { alert('Thao tác thất bại: ' + e.message); }
     finally { setProcessing(null); setConfirmDismiss(null); }
   };
@@ -1134,11 +1118,11 @@ const TabReports = () => {
                   return (
                     <tr key={id} className="hover:bg-stone-50/50">
                       <td className="py-4 px-6">
-                        <p className="font-bold text-stone-900">{rep.type || rep.reason || rep.title || '—'}</p>
-                        <p className="text-xs text-stone-500 mt-1 max-w-xs line-clamp-2">{rep.desc || rep.description || ''}</p>
+                        <p className="font-bold text-stone-900">{rep.reason || '—'}</p>
+                        <p className="text-xs text-stone-500 mt-1 max-w-xs line-clamp-2">{rep.description || ''}</p>
                       </td>
-                      <td className="py-4 px-6 font-semibold text-stone-700">{rep.target || rep.reportedEntity || '—'}</td>
-                      <td className="py-4 px-6 text-stone-500">{rep.sender || rep.reporterName || rep.reportedBy || '—'}</td>
+                      <td className="py-4 px-6 font-semibold text-stone-700 text-xs">{rep.entityType ? `${rep.entityType}` : '—'}</td>
+                      <td className="py-4 px-6 text-stone-500">{rep.reporter?.name || rep.reporter?.email || '—'}</td>
                       <td className="py-4 px-6">
                         <StatusBadge status={rep.status || 'pending'} map={REPORT_STATUS_MAP} />
                       </td>
@@ -1325,28 +1309,74 @@ const TabAppointments = () => {
 ═══════════════════════════════════════════════════════════════════════════ */
 const TabContent = () => {
   const [subTab, setSubTab] = useState('articles');
+  const [articles, setArticles] = useState([]);
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
 
-  const ARTICLES = [
-    { id: 1, title: '5 Kinh nghiệm vàng khi đi thuê phòng trọ', category: 'Cẩm nang', author: 'Ban biên tập', date: '21/10/2023', views: 1242, status: 'published', body: 'Hãy cẩn thận kiểm tra hệ thống điện nước, đồng hồ công tơ trước khi đặt bút ký hợp đồng.' },
-    { id: 2, title: 'Quy định đăng tin và chính sách kiểm duyệt Locafy', category: 'Chính sách', author: 'Quản trị viên', date: '18/10/2023', views: 890, status: 'published', body: 'Các tin đăng trùng lặp hoặc chứa hình ảnh phản cảm sẽ bị gỡ bỏ ngay lập tức.' },
-  ];
+  const loadArticles = useCallback(async () => {
+    try {
+      const res = await LocafyApi.getAdminArticles({ limit: 50 });
+      setArticles(res.data || []);
+    } catch { /* silent */ }
+  }, []);
 
-  const FAQS = [
-    { q: 'Làm thế nào để đăng ký tài khoản chủ trọ?', a: 'Chọn "Đăng ký" trên trang chủ, chọn vai trò Chủ trọ và điền đầy đủ thông tin.' },
-    { q: 'Tin đăng mất bao lâu để được duyệt?', a: 'Thường trong vòng 24 giờ làm việc. Admin sẽ kiểm tra và phê duyệt.' },
-    { q: 'Tiền đặt cọc được hoàn lại khi nào?', a: 'Cọc được hoàn trả trong 7 ngày làm việc nếu không ký hợp đồng.' },
-  ];
+  const loadBanners = useCallback(async () => {
+    try {
+      const res = await LocafyApi.getAdminBanners({ limit: 50 });
+      setBanners(res.data || []);
+    } catch { /* silent */ }
+  }, []);
 
-  const BANNERS = [
-    { id: 1, name: 'Banner Trang Chủ Hero', position: 'Homepage', status: 'active', size: '1200×400px' },
-    { id: 2, name: 'Banner Khuyến mãi Tháng 12', position: 'Listing Page', status: 'inactive', size: '728×90px' },
-  ];
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([loadArticles(), loadBanners()]).finally(() => setLoading(false));
+  }, [loadArticles, loadBanners]);
+
+  const handlePublishToggle = async (article) => {
+    try {
+      await LocafyApi.publishArticle(article._id, !article.isPublished);
+      setArticles(prev => prev.map(a => a._id === article._id ? { ...a, isPublished: !a.isPublished } : a));
+    } catch (e) { alert('Lỗi: ' + e.message); }
+  };
+
+  const handleDeleteArticle = async (id) => {
+    if (!window.confirm('Xóa bài viết này?')) return;
+    setDeletingId(id);
+    try {
+      await LocafyApi.deleteArticle(id);
+      setArticles(prev => prev.filter(a => a._id !== id));
+    } catch (e) { alert('Lỗi: ' + e.message); }
+    finally { setDeletingId(null); }
+  };
+
+  const handleToggleBanner = async (banner) => {
+    try {
+      await LocafyApi.updateBanner(banner._id, { isActive: !banner.isActive });
+      setBanners(prev => prev.map(b => b._id === banner._id ? { ...b, isActive: !b.isActive } : b));
+    } catch (e) { alert('Lỗi: ' + e.message); }
+  };
+
+  const handleDeleteBanner = async (id) => {
+    if (!window.confirm('Xóa banner này?')) return;
+    setDeletingId(id);
+    try {
+      await LocafyApi.deleteBanner(id);
+      setBanners(prev => prev.filter(b => b._id !== id));
+    } catch (e) { alert('Lỗi: ' + e.message); }
+    finally { setDeletingId(null); }
+  };
 
   const SUB_TABS = [
-    { key: 'articles', label: 'Bài viết' },
+    { key: 'articles', label: 'Bài viết / Chính sách' },
     { key: 'faq',      label: 'FAQ' },
     { key: 'banners',  label: 'Banner' },
   ];
+
+  const articleList = articles.filter(a => a.type !== 'faq');
+  const faqList     = articles.filter(a => a.type === 'faq');
+
+  const TYPE_LABEL = { blog: 'Blog', faq: 'FAQ', policy: 'Chính sách', guide: 'Cẩm nang' };
 
   return (
     <div className="space-y-6">
@@ -1355,12 +1385,6 @@ const TabContent = () => {
           <h2 className="text-2xl font-extrabold text-stone-900 mb-1">Quản Lý Nội Dung</h2>
           <p className="text-sm text-stone-500">Tạo mới, biên tập bài viết cẩm nang thuê phòng hoặc các chính sách nền tảng.</p>
         </div>
-        {subTab === 'articles' && (
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white text-sm font-bold rounded-full hover:bg-purple-700 transition-colors shadow-sm">
-            <i className="fa-solid fa-plus text-xs" />
-            Viết bài mới
-          </button>
-        )}
       </div>
 
       {/* Sub-tabs */}
@@ -1379,99 +1403,135 @@ const TabContent = () => {
         ))}
       </div>
 
+      {loading && <Spinner />}
+
       {/* Articles */}
-      {subTab === 'articles' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {ARTICLES.map(post => (
-            <div key={post.id} className="bg-white p-6 rounded-2xl border border-stone-200/60 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-700">{post.category}</span>
-                  <span className="text-xs text-stone-400">{post.date}</span>
-                </div>
-                <h3 className="font-bold text-stone-900 text-base mb-2 leading-snug">{post.title}</h3>
-                <p className="text-sm text-stone-500 line-clamp-3">{post.body}</p>
+      {!loading && subTab === 'articles' && (
+        <div className="space-y-4">
+          {articleList.length === 0
+            ? <EmptyState icon="fa-newspaper" text="Chưa có bài viết nào." />
+            : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {articleList.map(post => (
+                  <div key={post._id} className="bg-white p-6 rounded-2xl border border-stone-200/60 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-700">{TYPE_LABEL[post.type] || post.type}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${post.isPublished ? 'bg-green-50 text-green-700' : 'bg-stone-100 text-stone-500'}`}>
+                          {post.isPublished ? 'Đã xuất bản' : 'Nháp'}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-stone-900 text-base mb-2 leading-snug">{post.title}</h3>
+                      <p className="text-sm text-stone-500 line-clamp-2">{post.summary || ''}</p>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-stone-100 pt-4 mt-4">
+                      <button
+                        onClick={() => handlePublishToggle(post)}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${post.isPublished
+                          ? 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                          : 'bg-green-600 text-white hover:bg-green-700'}`}
+                      >
+                        {post.isPublished ? 'Ẩn bài' : 'Xuất bản'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteArticle(post._id)}
+                        disabled={deletingId === post._id}
+                        className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-40"
+                      >
+                        <i className="fa-solid fa-trash text-sm" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex justify-between items-center border-t border-stone-100 pt-4 mt-4">
-                <p className="text-xs text-stone-400">Tác giả: {post.author} • {post.views.toLocaleString()} lượt xem</p>
-                <div className="flex gap-2">
-                  <button className="p-2 text-stone-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                    <i className="fa-solid fa-pen-to-square text-sm" />
-                  </button>
-                  <button className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                    <i className="fa-solid fa-trash text-sm" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          }
         </div>
       )}
 
       {/* FAQ */}
-      {subTab === 'faq' && (
+      {!loading && subTab === 'faq' && (
         <div className="bg-white rounded-2xl border border-stone-200/60 shadow-sm overflow-hidden">
-          <div className="flex justify-between items-center px-6 py-4 border-b border-stone-100">
+          <div className="px-6 py-4 border-b border-stone-100">
             <h3 className="font-bold text-stone-900">Câu hỏi thường gặp</h3>
-            <button className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-xs font-bold rounded-full hover:bg-purple-700 transition-colors">
-              <i className="fa-solid fa-plus" /> Thêm câu hỏi
-            </button>
           </div>
-          <div className="divide-y divide-stone-100">
-            {FAQS.map((faq, i) => (
-              <div key={i} className="px-6 py-4 hover:bg-stone-50/50 transition-colors">
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex-1">
-                    <p className="font-bold text-stone-900 text-sm mb-1">{faq.q}</p>
-                    <p className="text-sm text-stone-600">{faq.a}</p>
+          {faqList.length === 0
+            ? <EmptyState icon="fa-circle-question" text="Chưa có câu hỏi FAQ nào." />
+            : (
+              <div className="divide-y divide-stone-100">
+                {faqList.map(faq => (
+                  <div key={faq._id} className="px-6 py-4 hover:bg-stone-50/50 transition-colors">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <p className="font-bold text-stone-900 text-sm mb-1">{faq.title}</p>
+                        <p className="text-sm text-stone-600 line-clamp-3">{faq.summary || ''}</p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => handlePublishToggle(faq)}
+                          className={`p-1.5 rounded-lg transition-all text-xs ${faq.isPublished ? 'text-amber-500 hover:bg-amber-50' : 'text-green-600 hover:bg-green-50'}`}
+                          title={faq.isPublished ? 'Ẩn' : 'Xuất bản'}
+                        >
+                          <i className={`fa-solid ${faq.isPublished ? 'fa-eye-slash' : 'fa-eye'}`} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteArticle(faq._id)}
+                          disabled={deletingId === faq._id}
+                          className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-40"
+                        >
+                          <i className="fa-solid fa-trash text-xs" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button className="p-1.5 text-stone-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                      <i className="fa-solid fa-pen-to-square text-xs" />
-                    </button>
-                    <button className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                      <i className="fa-solid fa-trash text-xs" />
-                    </button>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )
+          }
         </div>
       )}
 
       {/* Banners */}
-      {subTab === 'banners' && (
+      {!loading && subTab === 'banners' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
-            <button className="flex items-center gap-1.5 px-5 py-2.5 bg-purple-600 text-white text-sm font-bold rounded-full hover:bg-purple-700 transition-colors shadow-sm">
-              <i className="fa-solid fa-plus text-xs" /> Thêm banner
-            </button>
-          </div>
-          {BANNERS.map(banner => (
-            <div key={banner.id} className="bg-white p-5 rounded-2xl border border-stone-200/60 shadow-sm flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-10 bg-stone-100 rounded-xl flex items-center justify-center text-stone-400 shrink-0">
-                  <i className="fa-regular fa-image text-xl" />
+          {banners.length === 0
+            ? <EmptyState icon="fa-image" text="Chưa có banner nào." />
+            : banners.map(banner => (
+              <div key={banner._id} className="bg-white p-5 rounded-2xl border border-stone-200/60 shadow-sm flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  {banner.imageUrl
+                    ? <img src={banner.imageUrl} alt={banner.title} className="w-16 h-12 rounded-xl object-cover shrink-0 border border-stone-200" />
+                    : (
+                      <div className="w-16 h-12 bg-stone-100 rounded-xl flex items-center justify-center text-stone-400 shrink-0">
+                        <i className="fa-regular fa-image text-xl" />
+                      </div>
+                    )
+                  }
+                  <div>
+                    <p className="font-bold text-stone-900 text-sm">{banner.title}</p>
+                    <p className="text-xs text-stone-500 mt-0.5">Vị trí: {banner.position}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold text-stone-900 text-sm">{banner.name}</p>
-                  <p className="text-xs text-stone-500 mt-0.5">Vị trí: {banner.position} • Kích thước: {banner.size}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleToggleBanner(banner)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${banner.isActive
+                      ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                  >
+                    {banner.isActive ? 'Đang hiển thị' : 'Đã tắt'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteBanner(banner._id)}
+                    disabled={deletingId === banner._id}
+                    className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-40"
+                  >
+                    <i className="fa-solid fa-trash text-sm" />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${banner.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-stone-100 text-stone-600'}`}>
-                  {banner.status === 'active' ? 'Đang hiển thị' : 'Đã tắt'}
-                </span>
-                <button className="p-1.5 text-stone-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all">
-                  <i className="fa-solid fa-pen-to-square text-sm" />
-                </button>
-                <button className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                  <i className="fa-solid fa-trash text-sm" />
-                </button>
-              </div>
-            </div>
-          ))}
+            ))
+          }
         </div>
       )}
     </div>
@@ -1490,10 +1550,19 @@ const TabSettings = () => {
   const [phone, setPhone]               = useState(user?.phone || '');
   const [saved, setSaved]               = useState(false);
 
-  const handleSaveProfile = (e) => {
+  const [saving, setSaving] = useState(false);
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setSaving(true);
+    try {
+      await LocafyApi.updateProfile({ name: fullName, phone });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      alert('Lưu thất bại: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const ToggleSwitch = ({ checked, onChange, id }) => (
@@ -1557,8 +1626,8 @@ const TabSettings = () => {
             </div>
             <div className="md:col-span-2 flex items-center justify-end gap-3 pt-2">
               {saved && <span className="text-xs text-green-600 font-medium flex items-center gap-1"><i className="fa-solid fa-circle-check" /> Đã lưu thành công!</span>}
-              <button type="submit" className="px-6 py-2.5 bg-purple-600 text-white text-sm font-bold rounded-full hover:bg-purple-700 active:scale-95 transition-all shadow-sm">
-                Lưu thay đổi
+              <button type="submit" disabled={saving} className="px-6 py-2.5 bg-purple-600 text-white text-sm font-bold rounded-full hover:bg-purple-700 active:scale-95 transition-all shadow-sm disabled:opacity-60">
+                {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
             </div>
           </form>
@@ -1669,6 +1738,427 @@ const TabSettings = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   TAB: PACKAGES – QUẢN LÝ GÓI DỊCH VỤ
+═══════════════════════════════════════════════════════════════════════════ */
+const TabPackages = () => {
+  const [packages, setPackages] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeView, setActiveView] = useState('packages'); // 'packages' | 'transactions'
+  const [pkgModal, setPkgModal] = useState(null); // null | 'create' | package object
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Form state
+  const [formName, setFormName] = useState('');
+  const [formDesc, setFormDesc] = useState('');
+  const [formPrice, setFormPrice] = useState('');
+  const [formDuration, setFormDuration] = useState('');
+  const [formTarget, setFormTarget] = useState('seller');
+  const [formMaxListings, setFormMaxListings] = useState('');
+  const [formFeatured, setFormFeatured] = useState(false);
+  const [formFeatures, setFormFeatures] = useState('');
+
+  const openCreate = () => {
+    setFormName(''); setFormDesc(''); setFormPrice('');
+    setFormDuration(''); setFormTarget('seller'); setFormMaxListings('');
+    setFormFeatured(false); setFormFeatures('');
+    setPkgModal('create');
+  };
+
+  const openEdit = (pkg) => {
+    setFormName(pkg.name || '');
+    setFormDesc(pkg.description || '');
+    setFormPrice(pkg.price ?? '');
+    setFormDuration(pkg.durationDays ?? '');
+    setFormTarget(pkg.targetRole || 'seller');
+    setFormMaxListings(pkg.maxListings ?? '');
+    setFormFeatured(pkg.isFeatured || false);
+    setFormFeatures(Array.isArray(pkg.features) ? pkg.features.join('\n') : (pkg.features || ''));
+    setPkgModal(pkg);
+  };
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const [pkgsRes, txnsRes] = await Promise.all([
+        LocafyApi.getServicePackages().catch(() => ({ data: [] })),
+        LocafyApi.getAdminTransactions({ limit: 100 }).catch(() => ({ data: [] })),
+      ]);
+      setPackages(pkgsRes.data || []);
+      setTransactions(txnsRes.data || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        name: formName.trim(),
+        description: formDesc.trim(),
+        price: Number(formPrice),
+        durationDays: Number(formDuration),
+        targetRole: formTarget,
+        maxListings: formMaxListings ? Number(formMaxListings) : null,
+        isFeatured: formFeatured,
+        features: formFeatures.split('\n').map(s => s.trim()).filter(Boolean),
+        isActive: true,
+      };
+      if (pkgModal === 'create') {
+        await LocafyApi.createServicePackage(payload);
+      } else {
+        await LocafyApi.updateServicePackage(pkgModal._id || pkgModal.id, payload);
+      }
+      setPkgModal(null);
+      await load();
+    } catch (err) {
+      alert('Lỗi lưu gói: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (pkg) => {
+    setDeleting(pkg._id || pkg.id);
+    try {
+      await LocafyApi.deleteServicePackage(pkg._id || pkg.id);
+      setPackages(prev => prev.filter(p => (p._id || p.id) !== (pkg._id || pkg.id)));
+    } catch (err) {
+      alert('Không thể xóa: ' + err.message);
+    } finally {
+      setDeleting(null);
+      setConfirmDelete(null);
+    }
+  };
+
+  const ROLE_LABEL = { seller: 'Chủ trọ', user: 'Người thuê', both: 'Tất cả' };
+  const ROLE_COLOR = { seller: 'bg-emerald-50 text-emerald-700 border-emerald-100', user: 'bg-blue-50 text-blue-700 border-blue-100', both: 'bg-purple-50 text-purple-700 border-purple-100' };
+
+  const TXN_STATUS_COLORS = {
+    pending:   'bg-amber-50 text-amber-700 border-amber-100',
+    success:   'bg-green-50 text-green-700 border-green-100',
+    failed:    'bg-red-50 text-red-700 border-red-100',
+    cancelled: 'bg-stone-100 text-stone-500 border-stone-200',
+  };
+  const TXN_STATUS_LABELS = { pending: 'Chờ TT', success: 'Thành công', failed: 'Thất bại', cancelled: 'Đã hủy' };
+
+  if (loading) return <Spinner />;
+  if (error) return <ErrorState message={error} onRetry={load} />;
+
+  const inputCls = 'w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 outline-none transition-all';
+  const labelCls = 'block text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1.5';
+
+  return (
+    <div className="space-y-6">
+      {/* Delete confirm modal */}
+      {confirmDelete && (
+        <ConfirmModal
+          title="Xóa gói dịch vụ"
+          message={`Bạn có chắc muốn xóa gói "${confirmDelete.name}"? Hành động này không thể hoàn tác.`}
+          confirmLabel="Xóa gói"
+          confirmCls="bg-red-600 hover:bg-red-700"
+          onConfirm={() => handleDelete(confirmDelete)}
+          onClose={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {/* Package form modal */}
+      {pkgModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-extrabold text-stone-900">
+                {pkgModal === 'create' ? 'Tạo gói dịch vụ mới' : `Chỉnh sửa: ${pkgModal.name}`}
+              </h3>
+              <button onClick={() => setPkgModal(null)} className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 transition-colors cursor-pointer">
+                <i className="fa-solid fa-xmark text-sm" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className={labelCls}>Tên gói *</label>
+                  <input required value={formName} onChange={e => setFormName(e.target.value)} placeholder="Free, Basic, Pro, Premium..." className={inputCls} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Mô tả ngắn</label>
+                  <input value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder="Mô tả quyền lợi tóm tắt" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Giá (VNĐ) *</label>
+                  <input required type="number" min="0" value={formPrice} onChange={e => setFormPrice(e.target.value)} placeholder="0 = Miễn phí" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Thời hạn (ngày) *</label>
+                  <input required type="number" min="1" value={formDuration} onChange={e => setFormDuration(e.target.value)} placeholder="30" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Đối tượng *</label>
+                  <select value={formTarget} onChange={e => setFormTarget(e.target.value)} className={inputCls}>
+                    <option value="seller">Chủ trọ (Seller)</option>
+                    <option value="user">Người thuê (User)</option>
+                    <option value="both">Tất cả</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Giới hạn tin đăng</label>
+                  <input type="number" min="0" value={formMaxListings} onChange={e => setFormMaxListings(e.target.value)} placeholder="Để trống = không giới hạn" className={inputCls} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Tính năng (mỗi dòng 1 tính năng)</label>
+                  <textarea
+                    rows={4}
+                    value={formFeatures}
+                    onChange={e => setFormFeatures(e.target.value)}
+                    placeholder="Đăng tối đa 5 tin&#10;Hỗ trợ ưu tiên&#10;Đẩy tin 3 lần/tháng"
+                    className={inputCls + ' resize-none'}
+                  />
+                </div>
+                <div className="col-span-2 flex items-center gap-3 p-3 bg-stone-50 rounded-xl border border-stone-200">
+                  <input
+                    type="checkbox"
+                    id="featured"
+                    checked={formFeatured}
+                    onChange={e => setFormFeatured(e.target.checked)}
+                    className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-stone-300"
+                  />
+                  <label htmlFor="featured" className="text-sm font-semibold text-stone-700 cursor-pointer">
+                    <i className="fa-solid fa-star text-amber-500 mr-1.5" />
+                    Đánh dấu là gói nổi bật (Recommended)
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-stone-100">
+                <button type="button" onClick={() => setPkgModal(null)} className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-full text-sm transition-colors cursor-pointer">
+                  Hủy
+                </button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold rounded-full text-sm transition-colors shadow-md shadow-purple-600/20 cursor-pointer">
+                  {saving ? <><i className="fa-solid fa-spinner fa-spin mr-1" />Đang lưu...</> : 'Lưu gói'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-extrabold text-stone-900 mb-1">Quản lý Gói Dịch Vụ</h2>
+          <p className="text-sm text-stone-500">Tạo, chỉnh sửa các gói và theo dõi lịch sử thanh toán của hệ thống.</p>
+        </div>
+        <button
+          onClick={openCreate}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-full shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+        >
+          <i className="fa-solid fa-plus" />
+          Tạo gói mới
+        </button>
+      </div>
+
+      {/* View tabs */}
+      <div className="flex gap-2">
+        {[['packages', 'fa-crown', `Gói dịch vụ (${packages.length})`], ['transactions', 'fa-receipt', `Giao dịch (${transactions.length})`]].map(([view, icon, label]) => (
+          <button
+            key={view}
+            onClick={() => setActiveView(view)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+              activeView === view
+                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                : 'bg-white text-stone-600 border-stone-200 hover:border-purple-300 hover:text-purple-600'
+            }`}
+          >
+            <i className={`fa-solid ${icon} text-[10px]`} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── Packages view ─── */}
+      {activeView === 'packages' && (
+        <>
+          {packages.length === 0 ? (
+            <EmptyState icon="fa-crown" text="Chưa có gói dịch vụ nào. Nhấn 'Tạo gói mới' để bắt đầu." />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {packages.map(pkg => {
+                const id = pkg._id || pkg.id;
+                const isDeleting = deleting === id;
+                return (
+                  <div
+                    key={id}
+                    className={`bg-white rounded-2xl border shadow-sm flex flex-col transition-all hover:shadow-md ${
+                      pkg.isFeatured ? 'border-purple-300 ring-1 ring-purple-200' : 'border-stone-200/60'
+                    }`}
+                  >
+                    {/* Card header */}
+                    <div className={`p-5 rounded-t-2xl ${
+                      pkg.isFeatured
+                        ? 'bg-gradient-to-br from-purple-600 to-purple-800 text-white'
+                        : 'bg-stone-50 border-b border-stone-200/60'
+                    }`}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          {pkg.isFeatured && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full mb-2">
+                              <i className="fa-solid fa-star text-amber-300" /> Nổi bật
+                            </span>
+                          )}
+                          <h3 className={`text-base font-extrabold ${pkg.isFeatured ? 'text-white' : 'text-stone-900'}`}>{pkg.name}</h3>
+                          <p className={`text-[11px] mt-0.5 ${pkg.isFeatured ? 'text-purple-200' : 'text-stone-400'}`}>{pkg.description}</p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                          pkg.isFeatured ? 'bg-white/15 text-white border-white/20' : (ROLE_COLOR[pkg.targetRole] || 'bg-stone-100 text-stone-600 border-stone-200')
+                        }`}>
+                          {ROLE_LABEL[pkg.targetRole] || pkg.targetRole}
+                        </span>
+                      </div>
+                      <div className={`mt-3 flex items-baseline gap-1 ${pkg.isFeatured ? 'text-white' : 'text-stone-900'}`}>
+                        <span className="text-2xl font-black">
+                          {pkg.price === 0 ? 'Miễn phí' : Number(pkg.price).toLocaleString('vi-VN') + '₫'}
+                        </span>
+                        {pkg.price > 0 && <span className={`text-xs ${pkg.isFeatured ? 'text-purple-200' : 'text-stone-400'}`}>/{pkg.durationDays} ngày</span>}
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    <div className="p-4 flex-1 space-y-1.5">
+                      {(Array.isArray(pkg.features) ? pkg.features : []).map((f, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-stone-600">
+                          <i className="fa-solid fa-circle-check text-purple-500 text-[10px] mt-0.5 shrink-0" />
+                          {f}
+                        </div>
+                      ))}
+                      {pkg.maxListings != null && (
+                        <div className="flex items-center gap-2 text-xs text-stone-500 mt-1">
+                          <i className="fa-solid fa-house-chimney text-amber-500 text-[10px]" />
+                          Tối đa {pkg.maxListings} tin đăng
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="px-4 pb-4 flex gap-2">
+                      <button
+                        onClick={() => openEdit(pkg)}
+                        className="flex-1 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-full transition-colors cursor-pointer"
+                      >
+                        <i className="fa-solid fa-pencil mr-1" /> Chỉnh sửa
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(pkg)}
+                        disabled={isDeleting}
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 text-xs font-bold rounded-full transition-colors disabled:opacity-40 cursor-pointer"
+                      >
+                        {isDeleting
+                          ? <i className="fa-solid fa-spinner fa-spin" />
+                          : <i className="fa-solid fa-trash" />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ─── Transactions view ─── */}
+      {activeView === 'transactions' && (
+        <>
+          <div className="bg-white rounded-2xl border border-stone-200/60 shadow-sm overflow-hidden">
+            {transactions.length === 0 ? (
+              <EmptyState icon="fa-receipt" text="Chưa có giao dịch nào trong hệ thống." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-stone-50 border-b border-stone-200">
+                    <tr>
+                      <th className="py-3 px-5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">Người dùng</th>
+                      <th className="py-3 px-5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">Gói dịch vụ</th>
+                      <th className="py-3 px-5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">Số tiền</th>
+                      <th className="py-3 px-5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">Ngày</th>
+                      <th className="py-3 px-5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {transactions.map((t) => {
+                      const statusCls = TXN_STATUS_COLORS[t.status] || 'bg-stone-100 text-stone-500 border-stone-200';
+                      return (
+                        <tr key={t._id} className="hover:bg-stone-50/50">
+                          <td className="py-3.5 px-5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                {initials(t.account?.name || '?')}
+                              </div>
+                              <div>
+                                <p className="font-bold text-stone-900 text-xs">{t.account?.name || '—'}</p>
+                                <p className="text-[10px] text-stone-400">{t.account?.email || ''}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-5 font-semibold text-stone-700 text-xs">{t.servicePackage?.name || '—'}</td>
+                          <td className="py-3.5 px-5 font-black text-purple-700 text-sm">{fmtPrice(t.amount)}</td>
+                          <td className="py-3.5 px-5 text-stone-500 text-xs">{fmtDate(t.createdAt)}</td>
+                          <td className="py-3.5 px-5">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusCls}`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                              {TXN_STATUS_LABELS[t.status] || t.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Revenue summary */}
+          {transactions.length > 0 && (() => {
+            const success = transactions.filter(t => t.status === 'success');
+            const total = success.reduce((s, t) => s + (t.amount || 0), 0);
+            const pending = transactions.filter(t => t.status === 'pending').length;
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { label: 'Tổng giao dịch', value: transactions.length, icon: 'fa-receipt', color: 'bg-stone-50 text-stone-600 border-stone-200' },
+                  { label: 'Thành công', value: success.length, icon: 'fa-circle-check', color: 'bg-green-50 text-green-700 border-green-100' },
+                  { label: 'Doanh thu', value: fmtPrice(total), icon: 'fa-wallet', color: 'bg-purple-50 text-purple-700 border-purple-100' },
+                  { label: 'Đang chờ', value: pending, icon: 'fa-hourglass-half', color: 'bg-amber-50 text-amber-700 border-amber-100' },
+                ].map(s => (
+                  <div key={s.label} className={`border rounded-2xl p-4 flex items-center gap-3 ${s.color}`}>
+                    <div className="w-9 h-9 rounded-xl bg-white/60 border border-current/20 flex items-center justify-center shrink-0">
+                      <i className={`fa-solid ${s.icon} text-sm`} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">{s.label}</p>
+                      <p className="text-base font-black">{s.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </>
+      )}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════════════════════ */
 const AdminDashboard = () => {
@@ -1690,6 +2180,7 @@ const AdminDashboard = () => {
     'users':         <TabUsers />,
     'reports':       <TabReports />,
     'appointments':  <TabAppointments />,
+    'packages':      <TabPackages />,
     'content':       <TabContent />,
     'settings':      <TabSettings />,
   };

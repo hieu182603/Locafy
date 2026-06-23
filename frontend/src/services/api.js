@@ -158,15 +158,85 @@ export const LocafyApi = {
   getServicePackages: () => apiGet('/service-packages'),
   getMySubscription: () => apiGet('/subscriptions/my'),
   getMyTransactions: () => apiGet('/transactions/my'),
+  createServicePackage: (data) => apiSend('POST', '/service-packages', data),
+  updateServicePackage: (id, data) => apiSend('PATCH', `/service-packages/${id}`, data),
+  deleteServicePackage: (id) => apiSend('DELETE', `/service-packages/${id}`),
+
+  // Auth - Forgot & Reset Password
+  forgotPassword: (data) => apiSend('POST', '/auth/forgot-password', data),
+  resetPassword: (data) => apiSend('POST', '/auth/reset-password', data),
 
   // Reports
   createReport: (data) => apiSend('POST', '/reports', data),
 
-  // Admin
-  getAdminAccounts: () => apiGet('/accounts'),
+  // ── Admin – Dashboard & Revenue ─────────────────────────────────────────
+  getAdminDashboard: () => apiGet('/admin/dashboard'),
+  getAdminRevenue: (params) => apiGet('/admin/revenue' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+
+  // ── Admin – Accounts ─────────────────────────────────────────────────────
+  // params: { role, isActive, verificationStatus, keyword, page, limit }
+  getAdminAccounts: (params) => apiGet('/admin/accounts' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  getAdminAccountDetail: (id) => apiGet(`/admin/accounts/${id}`),
   toggleAccountActive: (id) => apiSend('PATCH', `/accounts/${id}/toggle-active`),
+  // body: { status: 'approved'|'rejected', rejectedReason? }
   verifySeller: (id, data) => apiSend('PATCH', `/accounts/${id}/verify`, data),
-  getAdminReports: () => apiGet('/reports'),
+
+  // ── Admin – Listings ─────────────────────────────────────────────────────
+  // params: { status, sellerId, page, limit }
+  getAdminListings: (params) => apiGet('/admin/listings' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+
+  // ── Admin – Transactions ─────────────────────────────────────────────────
+  // params: { status, accountId, fromDate, toDate, page, limit }
+  getAdminTransactions: (params) => apiGet('/admin/transactions' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  // body: { refundAmount, refundReason }
+  refundTransaction: (id, data) => apiSend('POST', `/admin/transactions/${id}/refund`, data),
+
+  // ── Admin – Subscriptions ────────────────────────────────────────────────
+  getAdminSubscriptions: (params) => apiGet('/admin/subscriptions' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  expireSubscription: (id) => apiSend('PATCH', `/admin/subscriptions/${id}/expire`),
+
+  // ── Reports ──────────────────────────────────────────────────────────────
+  getAdminReports: (params) => apiGet('/reports' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  // body: { status: 'resolved'|'dismissed'|'reviewing', adminNote? }
+  resolveReport: (id, data) => apiSend('PATCH', `/reports/${id}/resolve`, data),
+
+  // ── Banners ──────────────────────────────────────────────────────────────
+  getBanners: (params) => apiGet('/banners' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  getAdminBanners: (params) => apiGet('/banners/all' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  createBanner: (data) => apiSend('POST', '/banners', data),
+  updateBanner: (id, data) => apiSend('PATCH', `/banners/${id}`, data),
+  deleteBanner: (id) => apiSend('DELETE', `/banners/${id}`),
+
+  // ── Articles (Blog / FAQ / Policy) ───────────────────────────────────────
+  getArticles: (params) => apiGet('/articles' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  getAdminArticles: (params) => apiGet('/articles/all' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  getArticleBySlug: (slug) => apiGet(`/articles/${slug}`),
+  getAdminArticle: (id) => apiGet(`/articles/admin/${id}`),
+  createArticle: (data) => apiSend('POST', '/articles', data),
+  updateArticle: (id, data) => apiSend('PATCH', `/articles/${id}`, data),
+  publishArticle: (id, isPublished) => apiSend('PATCH', `/articles/${id}/publish`, { isPublished }),
+  deleteArticle: (id) => apiSend('DELETE', `/articles/${id}`),
+
+  // ── Coupons ───────────────────────────────────────────────────────────────
+  getCoupons: (params) => apiGet('/coupons' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  getCoupon: (id) => apiGet(`/coupons/${id}`),
+  createCoupon: (data) => apiSend('POST', '/coupons', data),
+  updateCoupon: (id, data) => apiSend('PATCH', `/coupons/${id}`, data),
+  deleteCoupon: (id) => apiSend('DELETE', `/coupons/${id}`),
+  // body: { code, packageId?, packagePrice? }
+  validateCoupon: (data) => apiSend('POST', '/coupons/validate', data),
+
+  // Renter specific
+  getUserPreferences: () => apiGet('/accounts/preferences'),
+  updateUserPreferences: (data) => apiSend('PATCH', '/accounts/preferences', data),
+  getViewHistory: () => apiGet('/accounts/view-history'),
+  recordListingView: (id) => apiSend('POST', `/listings/${id}/view`),
+  buyPackage: (packageId) => apiSend('POST', '/payments/buy-package', { packageId }),
+  
+  // Seller specific
+  getSellerProfile: () => apiGet('/accounts/seller-profile'),
+  updateSellerProfile: (data) => apiSend('PATCH', '/accounts/seller-profile', data),
+  submitVerification: (data) => apiSend('POST', '/accounts/verify', data),
   
   // File Upload
   uploadFile: (file) => {

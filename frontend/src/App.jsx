@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import PrivateRoute from './components/PrivateRoute';
+import CompareFloatingBar from './components/CompareFloatingBar';
 
 // Import Pages
 import Home from './pages/Home';
@@ -13,6 +14,9 @@ import Search from './pages/Search';
 import Detail from './pages/Detail';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import ComparePage from './pages/user/ComparePage';
 
 // Import Dashboards
 import UserDashboard from './pages/user/UserDashboard';
@@ -21,7 +25,10 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 
 function AppContent() {
   const location = useLocation();
-  const hideHeaderFooter = ['/login', '/register'].includes(location.pathname);
+  const hideHeaderFooter = ['/login', '/register', '/forgot-password', '/reset-password'].includes(location.pathname) || 
+                           location.pathname.startsWith('/manage') || 
+                           location.pathname.startsWith('/user') || 
+                           location.pathname.startsWith('/admin');
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
@@ -35,8 +42,18 @@ function AppContent() {
           <Route path="/house-detail/:id" element={<Detail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected Renter (Buyer) Routes */}
+          <Route 
+            path="/user/compare" 
+            element={
+              <PrivateRoute allowedRoles={['user']}>
+                <ComparePage />
+              </PrivateRoute>
+            } 
+          />
           <Route 
             path="/user/*" 
             element={
@@ -70,6 +87,8 @@ function AppContent() {
           <Route path="*" element={<Home />} />
         </Routes>
       </main>
+
+      <CompareFloatingBar />
 
       {!hideHeaderFooter && <Footer />}
     </div>

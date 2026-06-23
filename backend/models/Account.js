@@ -75,6 +75,7 @@ const AccountSchema = new mongoose.Schema(
     passwordResetToken: { type: String, default: null },
     passwordResetExpires: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },
+    lastLogoutAt: { type: Date, default: null },
   },
   {
     timestamps: true, // tự thêm createdAt, updatedAt

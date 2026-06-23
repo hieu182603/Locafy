@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -12,6 +13,7 @@ app.use(cors());
 // JSON limit cao vì ảnh gửi dạng base64
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Database Connection ───────────────────────────────────────────────────────
 mongoose.connect(MONGODB_URI)
@@ -19,24 +21,55 @@ mongoose.connect(MONGODB_URI)
   .catch(err => console.error('MongoDB connection error:', err));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
-// Routes giữ lại
-app.use('/api/auth',             require('./routes/auth'));
-app.use('/api/listings',         require('./routes/listings'));
-app.use('/api/notifications',    require('./routes/notifications'));
-app.use('/api/accounts',         require('./routes/accounts'));
-app.use('/api/upload',           require('./routes/upload'));
+// ── PayOS Webhook (phải đặt TRƯỚC express.json để nhận raw body nếu cần) ─────
+app.use('/api/transactions/webhook', require('./routes/transactions'));
 
-// Routes mới
+// ── Auth & Accounts ───────────────────────────────────────────────────────────
+app.use('/api/auth',             require('./routes/auth'));
+app.use('/api/accounts',         require('./routes/accounts'));
+
+// ── User-specific ─────────────────────────────────────────────────────────────
+app.use('/api/user/preferences',    require('./routes/userPreferences'));
+app.use('/api/user/view-history',   require('./routes/viewHistory'));
+app.use('/api/user/saved-searches', require('./routes/savedSearches'));
+app.use('/api/favorites',           require('./routes/favorites'));
+
+// ── Seller-specific ───────────────────────────────────────────────────────────
+app.use('/api/seller/profile',    require('./routes/sellerProfile'));
+app.use('/api/seller/listings',   require('./routes/sellerListings'));
+app.use('/api/seller/customers',  require('./routes/sellerCustomers'));
+
+// ── Listings & Search (Public + Admin) ───────────────────────────────────────
+app.use('/api/listings',         require('./routes/listings'));
+
+// ── Properties & Rooms ───────────────────────────────────────────────────────
+app.use('/api/properties',       require('./routes/properties'));
+app.use('/api/rooms',            require('./routes/rooms'));
+
+// ── Appointments, Conversations, Messages ────────────────────────────────────
 app.use('/api/appointments',     require('./routes/appointments'));
 app.use('/api/conversations',    require('./routes/conversations'));
 app.use('/api/messages',         require('./routes/messages'));
-app.use('/api/properties',       require('./routes/properties'));
-app.use('/api/rooms',            require('./routes/rooms'));
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+app.use('/api/notifications',    require('./routes/notifications'));
+
+// ── Service Packages, Subscriptions, Transactions ────────────────────────────
 app.use('/api/service-packages', require('./routes/servicePackages'));
 app.use('/api/subscriptions',    require('./routes/subscriptions'));
 app.use('/api/transactions',     require('./routes/transactions'));
+
+// ── Reports & Upload ──────────────────────────────────────────────────────────
 app.use('/api/reports',          require('./routes/reports'));
-app.use('/api/favorites',        require('./routes/favorites'));
+app.use('/api/upload',           require('./routes/upload'));
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+app.use('/api/admin',            require('./routes/admin'));
+
+// ── Content Management (Banner, Article, Coupon) ──────────────────────────────
+app.use('/api/banners',          require('./routes/banners'));
+app.use('/api/articles',         require('./routes/articles'));
+app.use('/api/coupons',          require('./routes/coupons'));
 
 // ── Healthcheck ───────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

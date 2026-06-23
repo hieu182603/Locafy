@@ -1,16 +1,17 @@
 const nodemailer = require('nodemailer');
 
 function getTransport() {
-    const host = process.env.SMTP_HOST;
+    const host = process.env.EMAIL_HOST || process.env.SMTP_HOST;
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
     if (!host || !user || !pass) return null;
 
-    const port = Number(process.env.SMTP_PORT || 587);
+    const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 587);
+    const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
     return nodemailer.createTransport({
         host,
         port,
-        secure: port === 465, // 465 = SSL, 587 = STARTTLS
+        secure,
         auth: { user, pass },
     });
 }

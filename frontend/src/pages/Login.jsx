@@ -83,7 +83,7 @@ const Login = () => {
               {/* Identifier */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-stone-600 block ml-1" htmlFor="identifier">
-                  Tên đăng nhập 
+                  Tên đăng nhập
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-400">
@@ -131,7 +131,6 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Remember + Forgot */}
               <div className="flex items-center justify-between py-1">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input
@@ -142,13 +141,12 @@ const Login = () => {
                   />
                   <span className="text-xs text-stone-600 group-hover:text-blue-700 transition-colors">Ghi nhớ đăng nhập</span>
                 </label>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
+                <Link
+                  to="/forgot-password"
                   className="text-xs font-semibold text-blue-700 hover:text-blue-800 transition-colors"
                 >
                   Quên mật khẩu?
-                </a>
+                </Link>
               </div>
 
               <button

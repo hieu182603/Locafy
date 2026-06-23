@@ -77,4 +77,29 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
+// ── PATCH /:id/read – Đánh dấu conversation đã đọc ──────────────────────────
+router.patch('/:id/read', authMiddleware, async (req, res) => {
+  try {
+    const conv = await Conversation.findById(req.params.id);
+    if (!conv) return res.status(404).json({ error: 'Không tìm thấy cuộc trò chuyện.' });
+
+    const userId = req.user.id;
+    const isUser   = String(conv.user)   === String(userId);
+    const isSeller = String(conv.seller) === String(userId);
+
+    if (!isUser && !isSeller && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Không có quyền truy cập cuộc trò chuyện này.' });
+    }
+
+    if (isUser)   conv.unreadByUser   = 0;
+    if (isSeller) conv.unreadBySeller = 0;
+    await conv.save();
+
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error('PATCH /conversations/:id/read error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
