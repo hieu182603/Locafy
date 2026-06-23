@@ -1,0 +1,244 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Tailwind CSS v4 custom theme tokens from Locafy Design System */
+
+  /* Brand Colors */
+  --color-brand-50: hsl(var(--color-primary-50-hsl));
+  --color-brand-100: hsl(var(--color-primary-100-hsl));
+  --color-brand-200: hsl(var(--color-primary-200-hsl));
+  --color-brand-500: hsl(var(--color-primary-500-hsl));
+  --color-brand-600: hsl(var(--color-primary-600-hsl));
+  --color-brand-700: hsl(var(--color-primary-700-hsl));
+  --color-brand-800: hsl(var(--color-primary-800-hsl));
+  --color-brand-900: hsl(var(--color-primary-900-hsl));
+  --color-brand-950: hsl(var(--color-primary-950-hsl));
+
+  --color-seller-50: hsl(var(--color-secondary-50-hsl));
+  --color-seller-100: hsl(var(--color-secondary-100-hsl));
+  --color-seller-500: hsl(var(--color-secondary-500-hsl));
+  --color-seller-600: hsl(var(--color-secondary-600-hsl));
+  --color-seller-700: hsl(var(--color-secondary-700-hsl));
+
+  --color-accent-50: hsl(var(--color-accent-50-hsl));
+  --color-accent-100: hsl(var(--color-accent-100-hsl));
+  --color-accent-500: hsl(var(--color-accent-500-hsl));
+  --color-accent-600: hsl(var(--color-accent-600-hsl));
+  --color-accent-700: hsl(var(--color-accent-700-hsl));
+
+  --color-danger-50: hsl(var(--color-danger-50-hsl));
+  --color-danger-100: hsl(var(--color-danger-100-hsl));
+  --color-danger-500: hsl(var(--color-danger-500-hsl));
+  --color-danger-600: hsl(var(--color-danger-600-hsl));
+  --color-danger-700: hsl(var(--color-danger-700-hsl));
+
+  --color-neutral-50: hsl(var(--color-neutral-50-hsl));
+  --color-neutral-100: hsl(var(--color-neutral-100-hsl));
+  --color-neutral-200: hsl(var(--color-neutral-200-hsl));
+  --color-neutral-300: hsl(var(--color-neutral-300-hsl));
+  --color-neutral-400: hsl(var(--color-neutral-400-hsl));
+  --color-neutral-500: hsl(var(--color-neutral-500-hsl));
+  --color-neutral-600: hsl(var(--color-neutral-600-hsl));
+  --color-neutral-700: hsl(var(--color-neutral-700-hsl));
+  --color-neutral-800: hsl(var(--color-neutral-800-hsl));
+  --color-neutral-900: hsl(var(--color-neutral-900-hsl));
+
+  /* Compatibility Mappings */
+  --color-primary: hsl(var(--color-primary-900-hsl));
+  --color-teal-deep: hsl(var(--color-primary-900-hsl));
+  --color-teal-vibrant: hsl(var(--color-primary-600-hsl));
+  --color-forest-dark: hsl(var(--color-secondary-700-hsl));
+  --color-gold-accent: hsl(var(--color-accent-500-hsl));
+  --color-success: hsl(var(--color-secondary-500-hsl));
+  --color-error: hsl(var(--color-danger-500-hsl));
+
+  /* Material 3 Mappings */
+  --color-surface: hsl(var(--color-neutral-50-hsl));
+  --color-surface-dim: hsl(var(--color-neutral-200-hsl));
+  --color-surface-bright: hsl(var(--color-neutral-50-hsl));
+  --color-surface-container-lowest: hsl(var(--color-neutral-50-hsl));
+  --color-surface-container-low: hsl(var(--color-neutral-100-hsl));
+  --color-surface-container: hsl(var(--color-neutral-100-hsl));
+  --color-surface-container-high: hsl(var(--color-neutral-200-hsl));
+  --color-surface-container-highest: hsl(var(--color-neutral-300-hsl));
+  --color-surface-variant: hsl(var(--color-neutral-100-hsl));
+  --color-on-surface: hsl(var(--color-neutral-900-hsl));
+  --color-on-surface-variant: hsl(var(--color-neutral-600-hsl));
+  --color-inverse-surface: hsl(var(--color-neutral-800-hsl));
+  --color-inverse-on-surface: hsl(var(--color-neutral-50-hsl));
+  --color-outline: hsl(var(--color-neutral-400-hsl));
+  --color-outline-variant: hsl(var(--color-neutral-200-hsl));
+  --color-background: hsl(var(--color-neutral-50-hsl));
+  --color-on-background: hsl(var(--color-neutral-900-hsl));
+  
+  --color-primary-container: hsl(var(--color-primary-100-hsl));
+  --color-on-primary-container: hsl(var(--color-primary-900-hsl));
+  --color-on-primary: #ffffff;
+  --color-inverse-primary: hsl(var(--color-primary-200-hsl));
+  --color-primary-fixed: hsl(var(--color-primary-100-hsl));
+  --color-primary-fixed-dim: hsl(var(--color-primary-200-hsl));
+  --color-on-primary-fixed: hsl(var(--color-primary-950-hsl));
+  --color-on-primary-fixed-variant: hsl(var(--color-primary-800-hsl));
+  
+  --color-secondary-container: hsl(var(--color-accent-100-hsl));
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: hsl(var(--color-accent-700-hsl));
+  --color-secondary-fixed: hsl(var(--color-secondary-100-hsl));
+  --color-secondary-fixed-dim: hsl(var(--color-secondary-500-hsl));
+  --color-on-secondary-fixed: hsl(var(--color-secondary-700-hsl));
+  --color-on-secondary-fixed-variant: hsl(var(--color-secondary-600-hsl));
+
+  --color-tertiary: hsl(var(--color-secondary-700-hsl));
+  --color-tertiary-container: hsl(var(--color-secondary-100-hsl));
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: hsl(var(--color-secondary-700-hsl));
+  --color-tertiary-fixed: hsl(var(--color-secondary-100-hsl));
+  --color-tertiary-fixed-dim: hsl(var(--color-secondary-500-hsl));
+  --color-on-tertiary-fixed: hsl(var(--color-secondary-700-hsl));
+  --color-on-tertiary-fixed-variant: hsl(var(--color-secondary-600-hsl));
+
+  --color-error-container: hsl(var(--color-danger-100-hsl));
+  --color-on-error-container: hsl(var(--color-danger-700-hsl));
+
+  --color-stone-200: hsl(var(--color-neutral-200-hsl));
+  --color-stone-500: hsl(var(--color-neutral-500-hsl));
+  --color-stone-900: hsl(var(--color-neutral-900-hsl));
+
+  /* Shadows */
+  --shadow-premium-sm: 0 2px 8px -1px rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.02);
+  --shadow-premium-md: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-premium-lg: 0 10px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+  --shadow-premium-xl: 0 20px 48px -6px rgba(15, 23, 42, 0.16), 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+
+  /* Border Radius */
+  --radius-premium-xs: 6px;
+  --radius-premium-sm: 8px;
+  --radius-premium-md: 12px;
+  --radius-premium-lg: 16px;
+  --radius-premium-xl: 20px;
+  --radius-premium-2xl: 24px;
+  --radius-premium-3xl: 32px;
+}
+
+:root {
+    /* Brand Color Palettes */
+    --color-primary-50-hsl: 214, 100%, 97%;   /* #eff6ff */
+    --color-primary-100-hsl: 214, 95%, 93%;   /* #dbeafe */
+    --color-primary-200-hsl: 213, 97%, 87%;   /* #bfdbfe */
+    --color-primary-500-hsl: 217, 91%, 60%;   /* #3b82f6 */
+    --color-primary-600-hsl: 221, 83%, 53%;   /* #2563eb */
+    --color-primary-700-hsl: 224, 76%, 48%;   /* #1d4ed8 */
+    --color-primary-800-hsl: 226, 70%, 40%;   /* #1e40af */
+    --color-primary-900-hsl: 224, 64%, 33%;   /* #1e3a8a */
+    --color-primary-950-hsl: 224, 71%, 19%;   /* #172554 */
+
+    --color-secondary-50-hsl: 152, 81%, 96%;  /* #ecfdf5 */
+    --color-secondary-100-hsl: 149, 80%, 90%; /* #d1fae5 */
+    --color-secondary-500-hsl: 142, 71%, 45%; /* #10b981 */
+    --color-secondary-600-hsl: 142, 72%, 29%; /* #059669 */
+    --color-secondary-700-hsl: 143, 64%, 24%; /* #047857 */
+
+    --color-accent-50-hsl: 48, 100%, 96%;    /* #fffbeb */
+    --color-accent-100-hsl: 48, 96%, 89%;    /* #fef3c7 */
+    --color-accent-500-hsl: 45, 93%, 47%;    /* #f59e0b */
+    --color-accent-600-hsl: 38, 92%, 44%;    /* #d97706 */
+    --color-accent-700-hsl: 29, 90%, 38%;    /* #b45309 */
+
+    --color-danger-50-hsl: 0, 100%, 97%;     /* #fef2f2 */
+    --color-danger-100-hsl: 0, 96%, 89%;     /* #fee2e2 */
+    --color-danger-500-hsl: 0, 84%, 60%;     /* #ef4444 */
+    --color-danger-600-hsl: 0, 72%, 51%;     /* #dc2626 */
+    --color-danger-700-hsl: 0, 74%, 42%;     /* #b91c1c */
+
+    --color-neutral-50-hsl: 210, 40%, 98%;   /* #f8fafc */
+    --color-neutral-100-hsl: 210, 40%, 96%;  /* #f1f5f9 */
+    --color-neutral-200-hsl: 214, 32%, 91%;  /* #e2e8f0 */
+    --color-neutral-300-hsl: 213, 27%, 84%;  /* #cbd5e1 */
+    --color-neutral-400-hsl: 215, 20%, 65%;  /* #94a3b8 */
+    --color-neutral-500-hsl: 215, 16%, 47%;  /* #64748b */
+    --color-neutral-600-hsl: 215, 19%, 35%;  /* #475569 */
+    --color-neutral-700-hsl: 217, 19%, 27%;  /* #334155 */
+    --color-neutral-800-hsl: 222, 47%, 11%;  /* #1e293b */
+    --color-neutral-900-hsl: 222, 47%, 6%;   /* #0f172a */
+
+    --primary-50: hsl(var(--color-primary-50-hsl));
+    --primary-100: hsl(var(--color-primary-100-hsl));
+    --primary-500: hsl(var(--color-primary-500-hsl));
+    --primary-600: hsl(var(--color-primary-600-hsl));
+    --primary-700: hsl(var(--color-primary-700-hsl));
+    --primary-900: hsl(var(--color-primary-900-hsl));
+
+    --secondary-50: hsl(var(--color-secondary-50-hsl));
+    --secondary-600: hsl(var(--color-secondary-600-hsl));
+    --secondary-700: hsl(var(--color-secondary-700-hsl));
+
+    --accent-50: hsl(var(--color-accent-50-hsl));
+    --accent-500: hsl(var(--color-accent-500-hsl));
+    --accent-600: hsl(var(--color-accent-600-hsl));
+
+    --danger-50: hsl(var(--color-danger-50-hsl));
+    --danger-500: hsl(var(--color-danger-500-hsl));
+    --danger-600: hsl(var(--color-danger-600-hsl));
+
+    --neutral-50:  hsl(var(--color-neutral-50-hsl));
+    --neutral-100: hsl(var(--color-neutral-100-hsl));
+    --neutral-200: hsl(var(--color-neutral-200-hsl));
+    --neutral-500: hsl(var(--color-neutral-500-hsl));
+    --neutral-700: hsl(var(--color-neutral-700-hsl));
+    --neutral-900: hsl(var(--color-neutral-900-hsl));
+
+    /* Soft Premium Shadows */
+    --shadow-premium-sm: 0 2px 8px -1px rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.02);
+    --shadow-premium-md: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+    --shadow-premium-lg: 0 10px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+    --shadow-premium-xl: 0 20px 48px -6px rgba(15, 23, 42, 0.16), 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+
+    /* Transitions */
+    --transition-springy: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+body {
+    font-family: 'Be Vietnam Pro', 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--neutral-50);
+    color: var(--neutral-900);
+}
+
+/* Premium utilities */
+.gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--color-primary-700-hsl)) 0%, hsl(var(--color-primary-900-hsl)) 100%);
+}
+
+.gradient-secondary {
+    background: linear-gradient(135deg, hsl(var(--color-secondary-600-hsl)) 0%, hsl(var(--color-secondary-700-hsl)) 100%);
+}
+
+.gradient-accent {
+    background: linear-gradient(135deg, hsl(var(--color-accent-500-hsl)) 0%, hsl(var(--color-accent-700-hsl)) 100%);
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glass-card-dark {
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hover-lift {
+    transition: var(--transition-springy);
+}
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-premium-lg);
+}
+
+.hover-glow:hover {
+    box-shadow: 0 0 20px 0 rgba(37, 99, 235, 0.35);
+}
