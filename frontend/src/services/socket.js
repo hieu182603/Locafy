@@ -1,7 +1,13 @@
 import { io } from 'socket.io-client';
 
-// Connect to the proxy url (or empty string in development to use Vite proxy, or window.location.origin in production)
-const socketUrl = import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? window.location.origin : '');
-export const socket = io(socketUrl, {
-  autoConnect: false
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? window.location.origin : '');
+
+export const socket = io(SOCKET_URL, {
+  autoConnect: false,
+  auth: { token: '' },
 });
+
+/** Call before socket.connect() to inject the latest JWT. */
+export function initSocket(token) {
+  socket.auth.token = token || '';
+}

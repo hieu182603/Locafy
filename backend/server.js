@@ -85,91 +85,51 @@ app.get('/api/health', (req, res) => {
 // ── HTTP Server & Socket.io ───────────────────────────────────────────────────
 const http = require('http');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+  cors: { origin: '*', methods: ['GET', 'POST'] }
+});
+
+// Expose io cho các route dùng (messages.js emit sau khi save)
+app.set('io', io);
+
+// Socket auth middleware – xác thực JWT
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Unauthenticated'));
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'locafy_secret_key_2026_super_secure_fallback');
+    socket.userId = decoded.id || decoded._id;
+    socket.userRole = decoded.role;
+    next();
+  } catch {
+    next(new Error('Invalid token'));
   }
 });
 
 io.on('connection', (socket) => {
-  console.log('User connected to socket:', socket.id);
-
   // Join vào room theo conversationId
   socket.on('join_room', (conversationId) => {
     socket.join(conversationId);
-    console.log(`Socket ${socket.id} joined room: ${conversationId}`);
   });
 
-  // Rời room
+  // Rời room khi đổi conversation
   socket.on('leave_room', (conversationId) => {
     socket.leave(conversationId);
-    console.log(`Socket ${socket.id} left room: ${conversationId}`);
   });
 
-  // Gửi tin nhắn qua socket
-  // data: { conversationId, senderId, text, type }
-  socket.on('send_message', async (data) => {
-    const { conversationId, senderId, text, type = 'text' } = data;
-    try {
-      const { Message, Conversation } = require('./models');
-
-      // Tạo Message mới
-      const message = new Message({
-        conversation: conversationId,
-        sender: senderId,
-        type,
-        text: text || null,
-      });
-      await message.save();
-
-      // Cập nhật Conversation: lastMessage, lastMessageAt
-      const conv = await Conversation.findById(conversationId);
-      if (conv) {
-        conv.lastMessage = text || '[Tin nhắn]';
-        conv.lastMessageAt = new Date();
-        conv.lastMessageBy = senderId;
-
-        // Tăng unread counter cho phía nhận
-        if (String(conv.user) === String(senderId)) {
-          conv.unreadBySeller = (conv.unreadBySeller || 0) + 1;
-        } else {
-          conv.unreadByUser = (conv.unreadByUser || 0) + 1;
-        }
-        await conv.save();
-      }
-
-      // Phát tới tất cả client trong room
-      io.to(conversationId).emit('receive_message', {
-        _id: message._id,
-        conversation: conversationId,
-        sender: senderId,
-        type,
-        text,
-        createdAt: message.createdAt,
-      });
-    } catch (error) {
-      console.error('Socket send_message error:', error);
-      socket.emit('message_error', { error: 'Không thể gửi tin nhắn. Vui lòng thử lại.' });
-    }
+  // Typing indicator – chỉ broadcast sang client còn lại trong room
+  socket.on('typing', ({ conversationId }) => {
+    socket.to(conversationId).emit('typing', { senderId: socket.userId });
   });
 
-  // Typing indicator
-  socket.on('typing', (data) => {
-    const { conversationId, senderId } = data;
-    socket.to(conversationId).emit('typing', { senderId });
+  socket.on('stop_typing', ({ conversationId }) => {
+    socket.to(conversationId).emit('stop_typing', { senderId: socket.userId });
   });
 
-  socket.on('stop_typing', (data) => {
-    const { conversationId, senderId } = data;
-    socket.to(conversationId).emit('stop_typing', { senderId });
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected from socket:', socket.id);
-  });
+  socket.on('disconnect', () => {});
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────

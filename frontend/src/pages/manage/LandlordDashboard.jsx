@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LocafyApi } from '../../services/api';
-import { socket } from '../../services/socket';
+import { socket, initSocket } from '../../services/socket';
 
 function getInitials(name) {
   if (!name) return 'U';
@@ -245,10 +245,14 @@ const LandlordDashboard = () => {
   // ── Chat ────────────────────────────────────────────────────────────────────
   const [conversations, setConversations] = useState([]);
   const [activeChatId, setActiveChatId] = useState('');
-  const [activeChatName, setActiveChatName] = useState('');
+  const [activeConv, setActiveConv] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [msgInput, setMsgInput] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [isChatTyping, setIsChatTyping] = useState(false);
   const chatEndRef = useRef(null);
+  const chatTypingTimerRef = useRef(null);
 
   // ── Profile ──────────────────────────────────────────────────────────────────
   const [profileName, setProfileName] = useState('');
@@ -499,49 +503,68 @@ const LandlordDashboard = () => {
   }, [currentTab, user, editId]);
 
   // ─── Socket.io Chat ────────────────────────────────────────────────────────
+  // Connect once when user is available
+  useEffect(() => {
+    if (!user) return;
+    initSocket(localStorage.getItem('locafy_token'));
+    if (!socket.connected) socket.connect();
+  }, [user]);
+
+  // Join room + receive events when active conversation changes
   useEffect(() => {
     if (!activeChatId || !user) return;
+    const myId = user?._id || user?.id || '';
 
     const loadMsgs = async () => {
+      setLoadingMsgs(true);
       try {
         const res = await LocafyApi.getMessages(activeChatId);
-        const msgs = res.data || [];
-        setChatMessages(msgs.map(m => ({
-          sender: m.senderUsername === user.username || m.senderId === user._id || (m.sender?._id || m.sender) === user._id ? 'me' : 'them',
-          text: m.text || m.content,
-          time: m.time || m.createdAt,
-        })));
+        setChatMessages(res.data || []);
+        LocafyApi.markConversationRead(activeChatId).catch(() => {});
       } catch { setChatMessages([]); }
+      finally { setLoadingMsgs(false); }
     };
     loadMsgs();
 
-    socket.connect();
     socket.emit('join_room', activeChatId);
 
     const onReceive = (msg) => {
-      setChatMessages(prev => [...prev, {
-        sender: (msg.senderUsername === user.username || msg.senderId === user._id || (msg.sender?._id || msg.sender) === user._id) ? 'me' : 'them',
-        text: msg.text || msg.content,
-        time: msg.time || new Date().toISOString(),
-      }]);
+      const senderId = msg.sender?._id || msg.sender;
+      if (String(senderId) === String(myId)) return;
+      setChatMessages(prev => [...prev, msg]);
+      setConversations(prev => prev.map(c =>
+        c._id === activeChatId
+          ? { ...c, lastMessage: msg.text || '[Hình ảnh]', lastMessageAt: msg.createdAt }
+          : c
+      ));
     };
+    const onTyping = ({ senderId }) => {
+      if (String(senderId) !== String(myId)) setIsChatTyping(true);
+    };
+    const onStopTyping = () => setIsChatTyping(false);
+
     socket.on('receive_message', onReceive);
+    socket.on('typing', onTyping);
+    socket.on('stop_typing', onStopTyping);
 
     return () => {
       socket.off('receive_message', onReceive);
-      socket.disconnect();
+      socket.off('typing', onTyping);
+      socket.off('stop_typing', onStopTyping);
     };
   }, [activeChatId, user]);
 
   // Scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  }, [chatMessages, isChatTyping]);
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const selectConversation = async (conv) => {
+    if (activeChatId) socket.emit('leave_room', activeChatId);
     setActiveChatId(conv._id || conv.id);
-    setActiveChatName(conv.otherUserName || conv.name || 'Khách');
+    setActiveConv(conv);
+    setIsChatTyping(false);
   };
 
   const toggleAmenity = (item) => {
@@ -945,17 +968,38 @@ const LandlordDashboard = () => {
     } catch { alert('Cập nhật thất bại.'); }
   };
 
-  // Send chat message via socket
-  const handleSendMsg = (e) => {
+  // Send chat message via REST (server emits to socket room after save)
+  const handleSendMsg = async (e) => {
     e.preventDefault();
-    if (!msgInput.trim() || !activeChatId) return;
-    const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    socket.emit('send_message', {
-      chatId: activeChatId, senderUsername: user.username, text: msgInput, time,
-    });
-    setChatMessages(prev => [...prev, { sender: 'me', text: msgInput, time }]);
-    LocafyApi.sendMessage({ conversationId: activeChatId, content: msgInput }).catch(() => { });
+    if (!msgInput.trim() || !activeChatId || sendingMsg) return;
+    setSendingMsg(true);
+    const text = msgInput.trim();
     setMsgInput('');
+    socket.emit('stop_typing', { conversationId: activeChatId });
+    try {
+      const res = await LocafyApi.sendMessage({ conversationId: activeChatId, text, type: 'text' });
+      setChatMessages(prev => [...prev, res.data]);
+      setConversations(prev => prev.map(c =>
+        c._id === activeChatId
+          ? { ...c, lastMessage: text, lastMessageAt: res.data.createdAt }
+          : c
+      ));
+    } catch {
+      alert('Không gửi được tin nhắn.');
+      setMsgInput(text);
+    } finally {
+      setSendingMsg(false);
+    }
+  };
+
+  const handleChatTypingInput = (e) => {
+    setMsgInput(e.target.value);
+    if (!activeChatId) return;
+    socket.emit('typing', { conversationId: activeChatId });
+    clearTimeout(chatTypingTimerRef.current);
+    chatTypingTimerRef.current = setTimeout(() => {
+      socket.emit('stop_typing', { conversationId: activeChatId });
+    }, 1500);
   };
 
   // PayOS – buy package
@@ -2338,6 +2382,8 @@ const LandlordDashboard = () => {
                     ) : conversations.map(conv => {
                       const convId = conv._id || conv.id;
                       const isActive = activeChatId === convId;
+                      const renterName = conv.user?.name || 'Khách';
+                      const renterAvatar = conv.user?.avatarUrl;
                       return (
                         <button
                           key={convId}
@@ -2347,17 +2393,17 @@ const LandlordDashboard = () => {
                               : 'bg-transparent text-gray-600 hover:bg-gray-100/50'
                             }`}
                         >
-                          {conv.otherUserAvatar ? (
-                            <img src={conv.otherUserAvatar} alt="avatar" className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-100" />
+                          {renterAvatar ? (
+                            <img src={renterAvatar} alt="avatar" className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-100" />
                           ) : (
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-seller-100 to-seller-200 text-seller-700 flex items-center justify-center text-xs font-black shrink-0 border border-seller-200/20">
-                              {(conv.otherUserName || conv.name || 'K').substring(0, 2).toUpperCase()}
+                              {renterName.substring(0, 2).toUpperCase()}
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-baseline mb-0.5">
                               <p className={`text-xs truncate ${isActive ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
-                                {conv.otherUserName || conv.name || 'Khách'}
+                                {renterName}
                               </p>
                               {conv.lastMessageAt && (
                                 <span className="text-[9px] text-gray-450 font-medium">
@@ -2383,24 +2429,35 @@ const LandlordDashboard = () => {
                   {activeChatId ? (
                     <>
                       {/* Header */}
-                      <div className="px-5 py-4 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-seller-500 to-seller-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-seller-500/10">
-                            {activeChatName.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-gray-900 text-sm">{activeChatName}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              <span className="text-[10px] text-emerald-600 font-bold tracking-wide uppercase">Đang hoạt động</span>
+                      {(() => {
+                        const rName = activeConv?.user?.name || 'Khách';
+                        const rAvatar = activeConv?.user?.avatarUrl;
+                        return (
+                          <div className="px-5 py-4 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-3">
+                              {rAvatar ? (
+                                <img src={rAvatar} alt={rName} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-seller-500 to-seller-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-seller-500/10">
+                                  {rName.substring(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-extrabold text-gray-900 text-sm">{rName}</p>
+                                {activeConv?.listing?.title && (
+                                  <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{activeConv.listing.title}</p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
 
                       {/* Messages */}
                       <div className="flex-grow overflow-y-auto p-5 space-y-4 bg-gray-50/30">
-                        {chatMessages.length === 0 ? (
+                        {loadingMsgs ? (
+                          <div className="flex justify-center pt-10"><div className="w-6 h-6 border-2 border-seller-200 border-t-seller-600 rounded-full animate-spin" /></div>
+                        ) : chatMessages.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-16 text-center">
                             <div className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center mb-3 shadow-premium-sm">
                               <i className="fa-solid fa-comments text-seller-500 text-lg animate-bounce" />
@@ -2408,19 +2465,33 @@ const LandlordDashboard = () => {
                             <p className="text-xs text-gray-400 font-bold">Bắt đầu cuộc trò chuyện!</p>
                             <p className="text-[10px] text-gray-300 mt-0.5">Hãy chào khách một tiếng thật ấm áp nhé.</p>
                           </div>
-                        ) : chatMessages.map((m, i) => (
-                          <div key={i} className={`flex ${m.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-[12.5px] shadow-premium-sm ${m.sender === 'me'
-                                ? 'bg-seller-600 text-white rounded-tr-sm'
-                                : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'
-                              }`}>
-                              <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
-                              <p className={`text-[9px] font-bold text-right mt-1.5 ${m.sender === 'me' ? 'text-seller-200' : 'text-gray-400'}`}>
-                                {m.time ? new Date(m.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                              </p>
+                        ) : chatMessages.map((m, i) => {
+                          const myId = user?._id || user?.id || '';
+                          const mine = String(m.sender?._id || m.sender || '') === String(myId);
+                          return (
+                            <div key={m._id || i} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-[12.5px] shadow-premium-sm ${mine
+                                  ? 'bg-seller-600 text-white rounded-tr-sm'
+                                  : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'
+                                }`}>
+                                <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                                <p className={`text-[9px] font-bold text-right mt-1.5 ${mine ? 'text-seller-200' : 'text-gray-400'}`}>
+                                  {m.createdAt ? new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {/* Typing indicator */}
+                        {isChatTyping && (
+                          <div className="flex justify-start">
+                            <div className="px-4 py-2.5 rounded-2xl bg-white border border-gray-100 shadow-premium-sm rounded-tl-sm flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                             </div>
                           </div>
-                        ))}
+                        )}
                         <div ref={chatEndRef} />
                       </div>
 
@@ -2442,15 +2513,19 @@ const LandlordDashboard = () => {
                         <input
                           type="text"
                           value={msgInput}
-                          onChange={e => setMsgInput(e.target.value)}
+                          onChange={handleChatTypingInput}
                           placeholder="Nhập tin nhắn..."
                           className="flex-grow bg-gray-50 border border-gray-250 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-seller-500 focus:border-seller-500 outline-none transition-all"
                         />
                         <button
                           type="submit"
-                          className="w-11 h-11 bg-seller-600 hover:bg-seller-700 text-white rounded-xl flex items-center justify-center transition active:scale-95 cursor-pointer shadow-premium-sm shadow-seller-500/10 border-0"
+                          disabled={!msgInput.trim() || sendingMsg}
+                          className="w-11 h-11 bg-seller-600 hover:bg-seller-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center transition active:scale-95 cursor-pointer shadow-premium-sm shadow-seller-500/10 border-0"
                         >
-                          <i className="fa-solid fa-paper-plane text-xs" />
+                          {sendingMsg
+                            ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            : <i className="fa-solid fa-paper-plane text-xs" />
+                          }
                         </button>
                       </form>
                     </>

@@ -109,6 +109,12 @@ router.post('/', authMiddleware, async (req, res) => {
 
     await message.populate('sender', 'name avatarUrl role');
 
+    // Broadcast realtime tới tất cả clients trong room (bao gồm cả sender)
+    const io = req.app.get('io');
+    if (io) {
+      io.to(conversationId).emit('receive_message', message.toObject());
+    }
+
     res.status(201).json({ ok: true, data: message });
   } catch (error) {
     console.error('POST /messages error:', error);
