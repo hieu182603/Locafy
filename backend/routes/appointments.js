@@ -230,7 +230,7 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
     appointment.status = status;
 
     if (status === 'cancelled') {
-      appointment.cancelledBy = isUser ? 'user' : 'seller';
+      appointment.cancelledBy = isUser ? 'user' : isSeller ? 'seller' : 'admin';
       appointment.cancelReason = cancelReason || null;
     }
     if (status === 'proposed') {
@@ -245,20 +245,21 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
     await appointment.save();
 
     // Gửi thông báo tương ứng
-    const notifMap = {
-      confirmed:  { to: appointment.user,   type: 'appointment_confirmed', title: 'Lịch hẹn được xác nhận' },
-      proposed:   { to: appointment.user,   type: 'appointment_proposed',  title: 'Seller đề xuất lịch mới' },
-      cancelled:  { to: isUser ? appointment.seller : appointment.user, type: 'appointment_cancelled', title: 'Lịch hẹn đã bị hủy' },
-    };
-    const notifConfig = notifMap[status];
-    if (notifConfig) {
-      await createNotification({
-        recipient: notifConfig.to,
-        type: notifConfig.type,
-        title: notifConfig.title,
-        entityType: 'appointment',
-        entityId: appointment._id,
-      });
+    if (status === 'confirmed') {
+      await createNotification({ recipient: appointment.user, type: 'appointment_confirmed', title: 'Lịch hẹn được xác nhận', entityType: 'appointment', entityId: appointment._id });
+    } else if (status === 'proposed') {
+      await createNotification({ recipient: appointment.user, type: 'appointment_proposed', title: 'Seller đề xuất lịch mới', entityType: 'appointment', entityId: appointment._id });
+    } else if (status === 'cancelled') {
+      if (isAdmin) {
+        // Admin hủy: thông báo cả hai bên
+        await Promise.all([
+          createNotification({ recipient: appointment.user,   type: 'appointment_cancelled', title: 'Lịch hẹn đã bị hủy bởi admin', entityType: 'appointment', entityId: appointment._id }),
+          createNotification({ recipient: appointment.seller, type: 'appointment_cancelled', title: 'Lịch hẹn đã bị hủy bởi admin', entityType: 'appointment', entityId: appointment._id }),
+        ]);
+      } else {
+        const notifyRecipient = isUser ? appointment.seller : appointment.user;
+        await createNotification({ recipient: notifyRecipient, type: 'appointment_cancelled', title: 'Lịch hẹn đã bị hủy', entityType: 'appointment', entityId: appointment._id });
+      }
     }
 
     res.status(200).json({ ok: true, data: appointment });

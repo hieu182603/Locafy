@@ -209,8 +209,8 @@ router.patch('/:id', authMiddleware, requireSeller, async (req, res) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     }
 
-    // Nếu đang approved/rejected → về pending khi chỉnh sửa
-    if (['approved', 'rejected'].includes(listing.status) && Object.keys(updates).length > 0) {
+    // Nếu đang approved/rejected/hidden → về pending khi chỉnh sửa (cần duyệt lại)
+    if (['approved', 'rejected', 'hidden'].includes(listing.status) && Object.keys(updates).length > 0) {
       updates.status = 'pending';
     }
 

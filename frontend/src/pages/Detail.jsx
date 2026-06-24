@@ -216,7 +216,7 @@ const Detail = () => {
     const fetchListing = async () => {
       setLoading(true);
       try {
-        const data = await LocafyApi.getListing(id);
+        const { data } = await LocafyApi.getListing(id);
         setListing(data);
         setMapStatusText(`Vị trí: ${buildAddress(data)}`);
 
@@ -240,7 +240,7 @@ const Detail = () => {
             limit: 4,
             exclude: data._id,
           });
-          setRelatedListings((related.listings || related || []).filter((r) => r._id !== data._id).slice(0, 4));
+          setRelatedListings((related.data || related.listings || []).filter((r) => r._id !== data._id).slice(0, 4));
         } catch (_) { /* ignore */ }
       } catch (err) {
         console.error('Error fetching listing:', err);
@@ -328,7 +328,7 @@ const Detail = () => {
         sellerId: listing.seller._id,
         listingId: listing._id,
       });
-      navigate(`/user?tab=chats&conversationId=${conv._id || conv.conversationId}`);
+      navigate(`/user?tab=chats&conversationId=${conv.data?._id || ''}`);
     } catch (err) {
       console.error('Chat error:', err);
       navigate('/user?tab=chats');
@@ -800,7 +800,7 @@ const Detail = () => {
                   <div>
                     <h4 className="font-bold text-gray-900 flex items-center gap-1.5">
                       {listing.seller.name}
-                      {listing.seller.verificationStatus === 'verified' && (
+                      {listing.seller.verificationStatus === 'approved' && (
                         <i className="fa-solid fa-circle-check text-blue-500 text-xs" title="Đã xác minh"></i>
                       )}
                     </h4>
@@ -957,7 +957,7 @@ const Detail = () => {
               {relatedListings.map((r) => (
                 <Link
                   key={r._id}
-                  to={`/detail/${r._id}`}
+                  to={`/house-detail/${r._id}`}
                   className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition group"
                 >
                   <div className="h-40 bg-slate-100 overflow-hidden">
@@ -1142,7 +1142,7 @@ const Detail = () => {
                 <div>
                   <h4 className="font-bold text-gray-900 flex items-center gap-1.5">
                     {listing.seller.name}
-                    {listing.seller.verificationStatus === 'verified' && (
+                    {listing.seller.verificationStatus === 'approved' && (
                       <i className="fa-solid fa-circle-check text-blue-500 text-xs"></i>
                     )}
                   </h4>

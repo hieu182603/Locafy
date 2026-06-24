@@ -209,6 +209,10 @@ router.patch('/:id/toggle-active', authMiddleware, async (req, res) => {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Chỉ admin mới có quyền thực hiện.' });
     }
+    if (String(req.params.id) === String(req.user.id)) {
+      return res.status(403).json({ error: 'Không thể tự khóa tài khoản của chính mình.' });
+    }
+
     const account = await Account.findById(req.params.id);
     if (!account) return res.status(404).json({ error: 'Không tìm thấy tài khoản.' });
 

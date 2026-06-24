@@ -85,6 +85,16 @@ router.post('/', authMiddleware, requireSellerOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc: propertyId, roomType, area, price.' });
     }
 
+    // Kiểm tra seller có quyền sở hữu property không
+    if (req.user.role === 'seller') {
+      const { Property } = require('../models');
+      const property = await Property.findById(propertyId).select('seller');
+      if (!property) return res.status(404).json({ error: 'Không tìm thấy nhà trọ.' });
+      if (String(property.seller) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'Nhà trọ này không thuộc về bạn.' });
+      }
+    }
+
     const room = new Room({
       property: propertyId,
       seller: req.user.id,

@@ -103,7 +103,7 @@ const Home = () => {
       try {
         const data = await LocafyApi.getListings({ status: 'approved' });
         // Accept both array response and { listings: [...] } shape
-        const arr = Array.isArray(data) ? data : (data?.listings ?? []);
+        const arr = Array.isArray(data) ? data : (data?.data ?? data?.listings ?? []);
         const approved = arr.filter((item) => item.status === 'approved');
         setListings(approved);
       } catch (err) {

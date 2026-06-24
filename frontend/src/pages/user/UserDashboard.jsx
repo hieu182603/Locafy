@@ -575,7 +575,7 @@ function ViewHistoryTab() {
           title="Lịch sử xem trống"
           subtitle="Bạn chưa click vào xem thông tin chi tiết phòng trọ nào."
           action={
-            <Link to="/listings" className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow">
+            <Link to="/phong-tro" className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow">
               <i className="fa-solid fa-compass" /> Xem danh sách phòng
             </Link>
           }
@@ -876,7 +876,7 @@ function AppointmentsTab() {
     try {
       const updated = await LocafyApi.updateAppointmentStatus(id, { status, ...(cancelReason ? { cancelReason } : {}) });
       setAppointments((prev) =>
-        prev.map((a) => (a._id === id ? { ...a, status: updated.status || status } : a))
+        prev.map((a) => (a._id === id ? { ...a, status: updated?.data?.status || status } : a))
       );
       setCancelModal(null);
       setCancelReason('');
@@ -920,7 +920,7 @@ function AppointmentsTab() {
           title="Không có lịch hẹn nào"
           subtitle="Bạn chưa có lịch hẹn nào ở trạng thái này."
           action={
-            <Link to="/listings" className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow">
+            <Link to="/phong-tro" className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow">
               <i className="fa-solid fa-magnifying-glass" /> Tìm phòng trọ ngay
             </Link>
           }
@@ -1104,7 +1104,7 @@ function FavoritesTab() {
           title="Danh sách yêu thích trống"
           subtitle="Bạn chưa lưu phòng trọ nào. Hãy tìm và lưu những tin ưng ý."
           action={
-            <Link to="/listings" className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow">
+            <Link to="/phong-tro" className="inline-flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow">
               <i className="fa-solid fa-compass" /> Khám phá phòng trọ
             </Link>
           }
@@ -1660,7 +1660,7 @@ const UserDashboard = () => {
 
           {/* Quick Find Room Link */}
           <Link
-            to="/listings"
+            to="/phong-tro"
             className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all text-center border border-blue-100"
           >
             <i className="fa-solid fa-magnifying-glass text-[10px]" /> Tìm phòng trọ

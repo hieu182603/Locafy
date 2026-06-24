@@ -8,7 +8,7 @@ module.exports = function(req, res, next) {
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'locafy_secret_key_2026_super_secure');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'locafy_secret_key_2026_super_secure_fallback');
     req.user = decoded; // Contains { id, email, role }
     next();
   } catch (error) {
