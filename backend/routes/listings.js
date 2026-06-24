@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Listing, ViewHistory } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { getActiveSubscription } = require('../utils/subscriptionHelper');
 
 // authMiddleware tuỳ chọn – không throw lỗi nếu không có token
 function optionalAuth(req, res, next) {
@@ -193,7 +194,7 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // Kiểm tra hạn mức tin đăng theo gói
-    const sub = await Subscription.findOne({ account: req.user.id, status: 'active' });
+    const sub = await getActiveSubscription(req.user.id);
     if (sub && sub.remainingListings !== null && sub.remainingListings <= 0) {
       return res.status(403).json({
         error: 'Bạn đã hết hạn mức tin đăng. Vui lòng nâng cấp gói dịch vụ.',

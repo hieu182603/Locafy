@@ -269,4 +269,26 @@ router.patch('/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
+// ── PATCH /:id/note – Seller cập nhật ghi chú nội bộ ──────────────────────────
+router.patch('/:id/note', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'seller') {
+      return res.status(403).json({ error: 'Chỉ seller mới có thể ghi chú.' });
+    }
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) return res.status(404).json({ error: 'Không tìm thấy lịch hẹn.' });
+    if (String(appointment.seller) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Không có quyền ghi chú lịch hẹn này.' });
+    }
+
+    appointment.sellerNote = req.body.sellerNote ?? null;
+    await appointment.save();
+
+    res.status(200).json({ ok: true, data: appointment });
+  } catch (error) {
+    console.error('PATCH /appointments/:id/note error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

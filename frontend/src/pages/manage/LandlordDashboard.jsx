@@ -221,6 +221,8 @@ const LandlordDashboard = () => {
   const [tenants, setTenants] = useState([]);
   const [tenantSearch, setTenantSearch] = useState('');
   const [tenantStatus, setTenantStatus] = useState('all');
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [noteText, setNoteText] = useState('');
 
   // ── Listing Form ─────────────────────────────────────────────────────────────
   const [listTitle, setListTitle] = useState('');
@@ -363,20 +365,19 @@ const LandlordDashboard = () => {
         switch (currentTab) {
           case 'overview': {
             const [listingsRes, apptsRes] = await Promise.all([
-              LocafyApi.getListings({ seller: true }),
+              LocafyApi.getMyListings({ limit: 100 }),
               LocafyApi.getAppointments(),
             ]);
             const listings = listingsRes.data || [];
             const appts = apptsRes.data || [];
-            const mine = listings.filter(l => l.ownerUsername === user.username || l.sellerId === user._id);
-            setMyListings(mine);
-            const revenue = mine.reduce((s, l) => {
+            setMyListings(listings);
+            const revenue = listings.reduce((s, l) => {
               if (l.status === 'rented' || l.rented) return s + (Number(l.price) || 0);
               return s;
             }, 0);
             setOverviewStats({
-              totalListings: mine.length,
-              activeListings: mine.filter(l => l.censored && l.status !== 'rented').length,
+              totalListings: listings.filter(l => l.status !== 'deleted').length,
+              activeListings: listings.filter(l => l.status === 'approved').length,
               pendingAppts: appts.filter(a => a.status === 'pending').length,
               revenue,
             });
@@ -398,9 +399,8 @@ const LandlordDashboard = () => {
             break;
           }
           case 'listings': {
-            const res = await LocafyApi.getListings({ seller: true });
-            const listings = res.data || [];
-            setMyListings(listings.filter(l => l.ownerUsername === user.username || l.sellerId === user._id));
+            const res = await LocafyApi.getMyListings({ limit: 100 });
+            setMyListings(res.data || []);
             break;
           }
           case 'add-listing': {
@@ -408,7 +408,7 @@ const LandlordDashboard = () => {
             setMyProperties(propsRes.data || []);
             if (editId) {
               try {
-                const res = await LocafyApi.getListing(editId);
+                const res = await LocafyApi.getMyListingDetail(editId);
                 const r = res.data;
                 if (r) {
                   setListTitle(r.title || '');
@@ -454,10 +454,9 @@ const LandlordDashboard = () => {
             break;
           }
           case 'tenants': {
-            // Tenants derived from approved/active appointments or contracts
-            const res = await LocafyApi.getAppointments();
+            const res = await LocafyApi.getAppointments({ limit: 100 });
             const data = res.data || [];
-            setTenants(data.filter(a => a.status === 'approved'));
+            setTenants(data.filter(a => ['confirmed', 'completed', 'pending', 'proposed'].includes(a.status)));
             break;
           }
           case 'packages': {
@@ -573,48 +572,34 @@ const LandlordDashboard = () => {
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
-  // Submit listing (create or edit)
-  const handleListingSubmit = async (e) => {
-    e.preventDefault();
-    if (!listTitle || !listPrice || !listingPropertyId || !listingRoomId) {
-      alert('Vui lòng chọn nhà trọ, chọn phòng và điền tiêu đề tin đăng.');
+  // Submit listing (create or edit), asDraft=true → lưu nháp
+  const handleListingSubmit = async (e, asDraft = false) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!listTitle || !listingRoomId) {
+      alert('Vui lòng chọn phòng và điền tiêu đề tin đăng.');
       return;
     }
-    if (user.verificationStatus !== 'approved' && !editId) {
+    if (!asDraft && user.verificationStatus !== 'approved') {
       alert('Tài khoản chưa được xác minh. Vui lòng hoàn thiện hồ sơ xác minh trước.');
       return;
     }
     setListSubmitting(true);
     try {
-      const prop = myProperties.find(p => (p._id === listingPropertyId || p.id === listingPropertyId));
-      if (!prop) {
-        alert('Không tìm thấy nhà trọ đã chọn.');
-        setListSubmitting(false);
-        return;
-      }
       const payload = {
-        room: listingRoomId,
-        property: listingPropertyId,
+        roomId: listingRoomId,
         title: listTitle,
-        roomType: listType, // single, shared, mini_apartment, apartment
-        price: Number(listPrice),
-        area: Number(listArea),
-        contactPhone: listPhone,
         description: listDesc,
-        amenities: listAmenities, // array of strings
         imageUrls: listImageUrls,
-        addressLine: prop.addressLine,
-        ward: prop.ward,
-        district: prop.district,
-        province: prop.province,
-        status: 'pending',
+        videoUrl: '',
+        availableFrom: null,
+        asDraft,
       };
       if (editId) {
-        await LocafyApi.updateListing(editId, payload);
-        alert('Cập nhật tin đăng thành công!');
+        await LocafyApi.updateSellerListing(editId, { title: listTitle, description: listDesc, imageUrls: listImageUrls });
+        alert(asDraft ? 'Đã lưu nháp.' : 'Cập nhật tin đăng thành công!');
       } else {
-        await LocafyApi.createListing(payload);
-        alert('Đã gửi tin đăng. Chờ Admin phê duyệt.');
+        await LocafyApi.createSellerListing(payload);
+        alert(asDraft ? 'Đã lưu nháp. Bạn có thể gửi duyệt sau.' : 'Đã gửi tin đăng. Chờ Admin phê duyệt.');
       }
       goTab('listings');
     } catch (err) {
@@ -628,9 +613,28 @@ const LandlordDashboard = () => {
   const handleDeleteListing = async (id) => {
     if (!window.confirm('Xóa tin đăng này?')) return;
     try {
-      await LocafyApi.deleteListing(id);
+      await LocafyApi.deleteSellerListing(id);
       setMyListings(prev => prev.filter(l => l._id !== id && l.id !== id));
     } catch { alert('Xóa thất bại.'); }
+  };
+
+  // Save seller note on appointment
+  const handleSaveNote = async (apptId) => {
+    try {
+      await LocafyApi.updateAppointmentNote(apptId, noteText);
+      setTenants(prev => prev.map(t => t._id === apptId ? { ...t, sellerNote: noteText } : t));
+      setEditingNoteId(null);
+    } catch { alert('Không thể lưu ghi chú.'); }
+  };
+
+  // Submit draft for review
+  const handleSubmitDraft = async (id) => {
+    try {
+      await LocafyApi.submitSellerListing(id);
+      setMyListings(prev => prev.map(l => (l._id === id ? { ...l, status: 'pending' } : l)));
+    } catch (err) {
+      alert('Lỗi: ' + (err.message || 'Không thể gửi duyệt'));
+    }
   };
 
   const handleListingImagesUpload = async (files) => {
@@ -1326,9 +1330,17 @@ const LandlordDashboard = () => {
                 />
               ) : (
                 <div className="space-y-4">
-                  {myListings.map(l => {
+                  {myListings.filter(l => l.status !== 'deleted').map(l => {
                     const id = l._id || l.id;
-                    const isRented = l.status === 'rented' || l.rented;
+                    const STATUS = {
+                      draft:    { cls: 'bg-gray-100 border-gray-200 text-gray-600',       label: 'Nháp' },
+                      pending:  { cls: 'bg-amber-50 border-amber-200 text-amber-700',     label: 'Chờ duyệt' },
+                      approved: { cls: 'bg-seller-50 border-seller-200 text-seller-700',  label: 'Đã duyệt' },
+                      rejected: { cls: 'bg-red-50 border-red-200 text-red-700',           label: 'Bị từ chối' },
+                      hidden:   { cls: 'bg-gray-50 border-gray-200 text-gray-500',        label: 'Đang ẩn' },
+                      expired:  { cls: 'bg-gray-100 border-gray-300 text-gray-500',       label: 'Hết hạn' },
+                    };
+                    const badge = STATUS[l.status] || STATUS.pending;
                     return (
                       <div
                         key={id}
@@ -1343,25 +1355,34 @@ const LandlordDashboard = () => {
                           <h4 className="font-bold text-gray-900 text-base line-clamp-1">{l.title}</h4>
                           <p className="text-xs text-gray-400 mt-1 line-clamp-1 flex items-center gap-1">
                             <i className="fa-solid fa-location-dot text-seller-500 shrink-0 text-[10px]" />
-                            <span>{l.addressLine || l.location}</span>
+                            <span>{l.district ? `${l.district}, ${l.province}` : (l.addressLine || '—')}</span>
                           </p>
+                          {l.status === 'rejected' && l.rejectedReason && (
+                            <p className="mt-1 text-[11px] text-red-600 bg-red-50 rounded-lg px-2.5 py-1 line-clamp-1">
+                              <i className="fa-solid fa-circle-exclamation mr-1" />{l.rejectedReason}
+                            </p>
+                          )}
                           <div className="flex items-center gap-3 mt-2.5">
                             <span className="text-sm font-black text-seller-700 bg-seller-50/50 border border-seller-100/50 px-2.5 py-0.5 rounded-lg">
                               {Number(l.price) >= 1000000
                                 ? (Number(l.price) / 1e6).toFixed(1) + ' tr/tháng'
                                 : (l.price || '—') + '/tháng'}
                             </span>
-                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${isRented
-                                ? 'bg-teal-50 border-teal-200 text-teal-700'
-                                : l.censored
-                                  ? 'bg-seller-50 border-seller-200 text-seller-700'
-                                  : 'bg-amber-50 border-amber-200 text-amber-700'
-                              }`}>
-                              {isRented ? 'Đang thuê' : l.censored ? 'Đã duyệt' : 'Chờ duyệt'}
+                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badge.cls}`}>
+                              {badge.label}
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          {l.status === 'draft' && (
+                            <button
+                              onClick={() => handleSubmitDraft(id)}
+                              className="px-3 py-1.5 text-seller-700 bg-seller-50 hover:bg-seller-100 rounded-xl transition border border-seller-200 cursor-pointer text-xs font-bold active:scale-95"
+                              title="Gửi duyệt"
+                            >
+                              <i className="fa-solid fa-paper-plane mr-1" />Gửi duyệt
+                            </button>
+                          )}
                           <button
                             onClick={() => goTab('add-listing', { editId: id })}
                             className="p-2.5 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-xl transition border-0 cursor-pointer shadow-xs active:scale-95"
@@ -1940,13 +1961,22 @@ const LandlordDashboard = () => {
                   >
                     Hủy bỏ
                   </button>
+                  {!editId && (
+                    <button
+                      type="button" disabled={listSubmitting || listImageLoading}
+                      onClick={(e) => handleListingSubmit(e, true)}
+                      className="px-6 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 disabled:opacity-60 text-gray-700 font-bold rounded-xl text-sm transition cursor-pointer"
+                    >
+                      {listSubmitting ? <i className="fa-solid fa-circle-notch fa-spin" /> : <><i className="fa-regular fa-floppy-disk mr-1.5" />Lưu nháp</>}
+                    </button>
+                  )}
                   <button
                     type="submit" disabled={listSubmitting || listImageLoading}
                     className="px-8 py-2.5 bg-seller-600 hover:bg-seller-700 disabled:opacity-60 text-white font-bold rounded-xl text-sm transition shadow-sm cursor-pointer border-0"
                   >
                     {listSubmitting
                       ? <><i className="fa-solid fa-circle-notch fa-spin mr-2" />{editId ? 'Đang lưu...' : 'Đang đăng...'}</>
-                      : (editId ? 'Lưu cập nhật' : 'Đăng tin')}
+                      : (editId ? 'Lưu cập nhật' : <><i className="fa-solid fa-paper-plane mr-1.5" />Gửi duyệt</>)}
                   </button>
                 </div>
               </form>
@@ -2077,40 +2107,74 @@ const LandlordDashboard = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100 text-left">
-                        {['Khách thuê', 'Phòng', 'Điện thoại', 'Ngày bắt đầu', 'Trạng thái'].map(h => (
+                        {['Khách thuê', 'Phòng', 'Điện thoại', 'Ngày hẹn', 'Trạng thái', 'Ghi chú'].map(h => (
                           <th key={h} className="py-3 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {filteredTenants.map(t => {
-                        const name = t.tenantName || t.visitorName || '—';
+                        const apptId = t._id || t.id;
+                        const user = t.user || {};
+                        const name = user.name || t.tenantName || t.visitorName || '—';
                         const initials = name.substring(0, 2).toUpperCase();
-                        const statusColors = {
-                          'Đang ở': 'bg-seller-100 text-seller-700',
-                          'Sắp hết hạn': 'bg-amber-100 text-amber-700',
-                          'Trễ thanh toán': 'bg-red-100 text-red-700',
+                        const STATUS_APPT = {
+                          pending:   { cls: 'bg-amber-100 text-amber-700',   label: 'Chờ xác nhận' },
+                          confirmed: { cls: 'bg-seller-100 text-seller-700', label: 'Đã xác nhận' },
+                          proposed:  { cls: 'bg-blue-100 text-blue-700',     label: 'Đề xuất lịch mới' },
+                          completed: { cls: 'bg-gray-100 text-gray-600',     label: 'Đã xem phòng' },
+                          no_show:   { cls: 'bg-red-100 text-red-600',       label: 'Không đến' },
                         };
+                        const apptBadge = STATUS_APPT[t.status] || { cls: 'bg-gray-100 text-gray-500', label: t.status };
+                        const isEditingNote = editingNoteId === apptId;
                         return (
-                          <tr key={t._id || t.id} className="hover:bg-gray-50/60 transition-colors">
+                          <tr key={apptId} className="hover:bg-gray-50/60 transition-colors">
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-seller-100 text-seller-700 flex items-center justify-center text-xs font-bold">
+                                <div className="w-8 h-8 rounded-full bg-seller-100 text-seller-700 flex items-center justify-center text-xs font-bold shrink-0">
                                   {initials}
                                 </div>
                                 <div>
                                   <p className="font-bold text-gray-800">{name}</p>
-                                  <p className="text-[11px] text-gray-400">{t.tenantEmail || ''}</p>
+                                  <p className="text-[11px] text-gray-400">{user.email || ''}</p>
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 px-4 text-gray-600">{t.roomTitle || '—'}</td>
-                            <td className="py-3 px-4 text-gray-500">{t.tenantPhone || '—'}</td>
-                            <td className="py-3 px-4 text-gray-500">{t.date || '—'}</td>
+                            <td className="py-3 px-4 text-gray-600 text-xs">{t.listing?.title || '—'}</td>
+                            <td className="py-3 px-4 text-gray-500 text-xs">{user.phone || '—'}</td>
+                            <td className="py-3 px-4 text-gray-500 text-xs whitespace-nowrap">
+                              {t.scheduledAt ? new Date(t.scheduledAt).toLocaleDateString('vi-VN') : '—'}
+                            </td>
                             <td className="py-3 px-4">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[t.tenantStatus] || 'bg-gray-100 text-gray-500'}`}>
-                                {t.tenantStatus || 'Đang ở'}
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${apptBadge.cls}`}>
+                                {apptBadge.label}
                               </span>
+                            </td>
+                            <td className="py-3 px-4 min-w-[180px]">
+                              {isEditingNote ? (
+                                <div className="flex gap-1.5 items-center">
+                                  <input
+                                    autoFocus
+                                    value={noteText}
+                                    onChange={e => setNoteText(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleSaveNote(apptId); if (e.key === 'Escape') setEditingNoteId(null); }}
+                                    placeholder="Nhập ghi chú..."
+                                    className="border border-gray-200 rounded-lg px-2.5 py-1 text-xs flex-1 focus:outline-none focus:ring-1 focus:ring-seller-400"
+                                  />
+                                  <button onClick={() => handleSaveNote(apptId)} className="text-seller-600 hover:text-seller-700 text-xs font-bold">Lưu</button>
+                                  <button onClick={() => setEditingNoteId(null)} className="text-gray-400 hover:text-gray-600 text-xs">Hủy</button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => { setEditingNoteId(apptId); setNoteText(t.sellerNote || ''); }}
+                                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-seller-600 group transition"
+                                >
+                                  <i className="fa-regular fa-pen-to-square opacity-0 group-hover:opacity-100 transition" />
+                                  <span className={t.sellerNote ? 'text-gray-700' : 'text-gray-400 italic'}>
+                                    {t.sellerNote || 'Thêm ghi chú...'}
+                                  </span>
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );

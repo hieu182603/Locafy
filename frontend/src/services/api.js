@@ -116,10 +116,18 @@ export const LocafyApi = {
   // Listings (public)
   getListings: (params) => apiGet('/listings' + (params ? '?' + new URLSearchParams(params).toString() : '')),
   getListing: (id) => apiGet(`/listings/${id}`),
-  // Listings (seller)
-  createListing: (data) => apiSend('POST', '/listings', data),
-  updateListing: (id, data) => apiSend('PATCH', `/listings/${id}`, data),
-  deleteListing: (id) => apiSend('DELETE', `/listings/${id}`),
+  getListingContact: (id) => apiGet(`/listings/${id}/contact`),
+  // Seller listings (/seller/listings)
+  getMyListings: (params) => apiGet('/seller/listings' + (params ? '?' + new URLSearchParams(params).toString() : '')),
+  getMyListingDetail: (id) => apiGet(`/seller/listings/${id}`),
+  createSellerListing: (data) => apiSend('POST', '/seller/listings', data),
+  updateSellerListing: (id, data) => apiSend('PATCH', `/seller/listings/${id}`, data),
+  submitSellerListing: (id) => apiSend('PATCH', `/seller/listings/${id}/submit`, {}),
+  hideSellerListing: (id) => apiSend('PATCH', `/seller/listings/${id}/hide`, {}),
+  boostListing: (id) => apiSend('PATCH', `/seller/listings/${id}/boost`, {}),
+  pinListing: (id) => apiSend('PATCH', `/seller/listings/${id}/pin`, {}),
+  refreshListing: (id) => apiSend('PATCH', `/seller/listings/${id}/refresh`, {}),
+  deleteSellerListing: (id) => apiSend('DELETE', `/seller/listings/${id}`),
   // Listings (admin)
   updateListingStatus: (id, data) => apiSend('PATCH', `/listings/${id}/status`, data),
 
@@ -136,9 +144,10 @@ export const LocafyApi = {
   deleteRoom: (id) => apiSend('DELETE', `/rooms/${id}`),
 
   // Appointments
-  getAppointments: () => apiGet('/appointments'),
+  getAppointments: (params) => apiGet('/appointments' + (params ? '?' + new URLSearchParams(params).toString() : '')),
   createAppointment: (data) => apiSend('POST', '/appointments', data),
   updateAppointmentStatus: (id, data) => apiSend('PATCH', `/appointments/${id}/status`, data),
+  updateAppointmentNote: (id, sellerNote) => apiSend('PATCH', `/appointments/${id}/note`, { sellerNote }),
 
   // Conversations & Messages
   getConversations: () => apiGet('/conversations'),
@@ -153,6 +162,11 @@ export const LocafyApi = {
   // Favorites
   getFavorites: () => apiGet('/favorites'),
   toggleFavorite: (listingId) => apiSend('POST', '/favorites/toggle', { listingId }),
+
+  // Saved Searches
+  getSavedSearches: () => apiGet('/user/saved-searches'),
+  createSavedSearch: (data) => apiSend('POST', '/user/saved-searches', data),
+  deleteSavedSearch: (id) => apiSend('DELETE', `/user/saved-searches/${id}`),
 
   // Service Packages
   getServicePackages: () => apiGet('/service-packages'),

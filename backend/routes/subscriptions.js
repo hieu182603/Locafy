@@ -3,6 +3,7 @@ const router = express.Router();
 const { Subscription, Transaction, ServicePackage, Account } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { createNotification } = require('./notifications');
+const { getActiveSubscription } = require('../utils/subscriptionHelper');
 
 // PayOS SDK – chỉ khởi tạo khi đã cấu hình
 let payOS = null;
@@ -18,7 +19,7 @@ function getPayOS() {
 // ── GET /my – Subscription đang active của account hiện tại ──────────────────
 router.get('/my', authMiddleware, async (req, res) => {
   try {
-    const subscription = await Subscription.findOne({ account: req.user.id, status: 'active' })
+    const subscription = await getActiveSubscription(req.user.id)
       .populate('servicePackage')
       .sort({ createdAt: -1 });
 

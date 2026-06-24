@@ -177,6 +177,8 @@ const Detail = () => {
 
   // Phone reveal
   const [phoneRevealed, setPhoneRevealed] = useState(false);
+  const [contactInfo, setContactInfo] = useState(null);
+  const [contactLoading, setContactLoading] = useState(false);
 
   // Geocode status
   const [mapStatusText, setMapStatusText] = useState('');
@@ -356,9 +358,26 @@ const Detail = () => {
     }
   };
 
+  // ── Reveal phone — call /contact API to fetch real phone ─────────────────
+  const handleRevealPhone = async () => {
+    if (!user) { setAuthModalOpen(true); return; }
+    if (phoneRevealed) return;
+    setContactLoading(true);
+    try {
+      const res = await LocafyApi.getListingContact(listing._id);
+      setContactInfo(res.data);
+      setPhoneRevealed(true);
+    } catch (err) {
+      console.error('Contact fetch error:', err);
+      alert('Không thể lấy thông tin liên hệ. Vui lòng thử lại.');
+    } finally {
+      setContactLoading(false);
+    }
+  };
+
   // ── Copy phone ────────────────────────────────────────────────────────────
   const handleCopyPhone = () => {
-    const phone = listing?.seller?.phone || '';
+    const phone = contactInfo?.seller?.phone || listing?.seller?.phone || '';
     navigator.clipboard.writeText(phone).then(() => alert(`Đã sao chép số: ${phone}`)).catch(() => { });
   };
 
@@ -389,8 +408,8 @@ const Detail = () => {
 
   const isOwner = user && (user.role === 'seller' || user.role === 'admin') && user._id === listing.seller?._id;
   const fullAddress = buildAddress(listing);
-  const sellerPhone = listing.seller?.phone || '';
-  const displayPhone = (user && phoneRevealed) ? sellerPhone : maskPhone(sellerPhone);
+  const sellerPhone = contactInfo?.seller?.phone || '';
+  const displayPhone = phoneRevealed ? sellerPhone : maskPhone(sellerPhone);
 
   return (
     <>
@@ -747,13 +766,14 @@ const Detail = () => {
                       <i className="fa-solid fa-circle-check text-green-500 mt-1 mr-2.5 shrink-0"></i>
                       <span>
                         <strong className="text-gray-900">Liên hệ:</strong>{' '}
-                        {phoneRevealed ? sellerPhone : maskPhone(sellerPhone)}{' '}
-                        {!phoneRevealed && sellerPhone && (
+                        {phoneRevealed ? sellerPhone : '••••••••••'}{' '}
+                        {!phoneRevealed && (
                           <button
-                            onClick={() => setPhoneRevealed(true)}
-                            className="text-blue-600 text-xs font-semibold hover:underline ml-1"
+                            onClick={handleRevealPhone}
+                            disabled={contactLoading}
+                            className="text-blue-600 text-xs font-semibold hover:underline ml-1 disabled:opacity-50"
                           >
-                            Hiển thị
+                            {contactLoading ? 'Đang tải...' : 'Hiển thị'}
                           </button>
                         )}
                       </span>
@@ -807,22 +827,23 @@ const Detail = () => {
                     <p className="text-xs text-gray-500">Người đăng tin xác thực</p>
                   </div>
                 </div>
-                {user && sellerPhone && (
+                {user && (
                   <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Số điện thoại</p>
                       <p className="text-base font-bold text-gray-900 mt-0.5">
-                        {phoneRevealed ? sellerPhone : maskPhone(sellerPhone)}
+                        {phoneRevealed ? sellerPhone : '••••••••••'}
                       </p>
                     </div>
                     <div className="flex gap-2">
                       {!phoneRevealed && (
                         <button
-                          onClick={() => setPhoneRevealed(true)}
-                          className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition text-xs font-semibold"
+                          onClick={handleRevealPhone}
+                          disabled={contactLoading}
+                          className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition text-xs font-semibold disabled:opacity-50"
                           title="Hiện số"
                         >
-                          <i className="fa-solid fa-eye"></i>
+                          {contactLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-eye"></i>}
                         </button>
                       )}
                       {phoneRevealed && (
@@ -891,11 +912,14 @@ const Detail = () => {
               {(!user || !phoneRevealed) && (
                 <div className="flex gap-3">
                   <button
-                    onClick={() => user ? setPhoneRevealed(true) : setAuthModalOpen(true)}
-                    className="flex-1 py-2.5 text-center text-xs font-bold bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition flex items-center justify-center gap-1.5"
+                    onClick={user ? handleRevealPhone : () => setAuthModalOpen(true)}
+                    disabled={contactLoading}
+                    className="flex-1 py-2.5 text-center text-xs font-bold bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    <i className="fa-solid fa-phone"></i>
-                    {user ? 'Hiện số điện thoại' : 'Gọi điện'}
+                    {contactLoading
+                      ? <><i className="fa-solid fa-spinner fa-spin"></i> Đang tải...</>
+                      : <><i className="fa-solid fa-phone"></i> {user ? 'Hiện số điện thoại' : 'Gọi điện'}</>
+                    }
                   </button>
 
                   <button
