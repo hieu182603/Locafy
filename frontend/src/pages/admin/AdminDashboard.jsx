@@ -53,7 +53,7 @@ const REPORT_STATUS_MAP = {
 
 const APPT_STATUS_MAP = {
   pending:   { label: 'Chờ xác nhận', cls: 'bg-amber-50 text-amber-700' },
-  approved:  { label: 'Đã xác nhận',  cls: 'bg-green-50 text-green-700' },
+  confirmed: { label: 'Đã xác nhận',  cls: 'bg-green-50 text-green-700' },
   cancelled: { label: 'Đã hủy',       cls: 'bg-stone-100 text-stone-500' },
 };
 

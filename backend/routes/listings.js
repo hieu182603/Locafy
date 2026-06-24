@@ -69,6 +69,16 @@ router.get('/', async (req, res) => {
     };
     const sort = sortMap[sortBy] || sortMap.newest;
 
+    // Reset boost/pin đã hết hạn (fire-and-forget, không block response)
+    const now = new Date();
+    Listing.updateMany(
+      { $or: [
+        { isBoosted: true, boostedUntil: { $lt: now } },
+        { isPinned: true, pinnedUntil: { $lt: now } },
+      ]},
+      { $set: { isBoosted: false, isPinned: false } }
+    ).exec();
+
     const skip = (Number(page) - 1) * Number(limit);
     const [items, total] = await Promise.all([
       Listing.find(filter)
@@ -103,7 +113,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     const listing = await Listing.findById(req.params.id)
       .populate('room')
       .populate('property')
-      .populate('seller', 'name avatarUrl isEmailVerified');
+      .populate('seller', 'name avatarUrl isEmailVerified verificationStatus');
 
     if (!listing) return res.status(404).json({ error: 'Không tìm thấy tin đăng.' });
     if (listing.status !== 'approved') {
@@ -169,8 +179,25 @@ router.get('/:id/contact', authMiddleware, async (req, res) => {
 // ── POST / – Seller tạo listing ──────────────────────────────────────────────
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== 'seller' && req.user.role !== 'admin') {
+    if (req.user.role !== 'seller') {
       return res.status(403).json({ error: 'Chỉ seller mới có thể đăng tin.' });
+    }
+
+    // Kiểm tra seller đã được xác minh chưa
+    const { Account, Subscription } = require('../models');
+    const account = await Account.findById(req.user.id).select('verificationStatus');
+    if (!account || account.verificationStatus !== 'approved') {
+      return res.status(403).json({
+        error: 'Seller chưa được xác minh. Vui lòng hoàn thành xác minh trước khi đăng tin.',
+      });
+    }
+
+    // Kiểm tra hạn mức tin đăng theo gói
+    const sub = await Subscription.findOne({ account: req.user.id, status: 'active' });
+    if (sub && sub.remainingListings !== null && sub.remainingListings <= 0) {
+      return res.status(403).json({
+        error: 'Bạn đã hết hạn mức tin đăng. Vui lòng nâng cấp gói dịch vụ.',
+      });
     }
 
     const listing = new Listing({
@@ -179,6 +206,14 @@ router.post('/', authMiddleware, async (req, res) => {
       status: 'pending',
     });
     await listing.save();
+
+    // Trừ hạn mức
+    if (sub && sub.remainingListings !== null) {
+      await Subscription.findOneAndUpdate(
+        { account: req.user.id, status: 'active', remainingListings: { $gt: 0 } },
+        { $inc: { remainingListings: -1 } }
+      );
+    }
 
     res.status(201).json({ ok: true, data: listing });
   } catch (error) {

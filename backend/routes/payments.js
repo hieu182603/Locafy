@@ -80,10 +80,11 @@ router.post('/buy-package', authMiddleware, async (req, res) => {
     const cleanDescription = `Goi ${pkg.name} ${orderCode}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 25);
     const origin = req.headers.origin || 'http://localhost:5173';
     
-    const isSeller = req.user.role === 'seller';
-    const redirectTab = isSeller ? 'packages' : 'billing';
-    const returnUrl = `${origin}/${isSeller ? 'manage' : 'user'}?tab=${redirectTab}&paymentStatus=success&orderCode=${orderCode}`;
-    const cancelUrl = `${origin}/${isSeller ? 'manage' : 'user'}?tab=${redirectTab}&paymentStatus=cancel&orderCode=${orderCode}`;
+    const role = req.user.role;
+    const dashboardPath = role === 'seller' ? 'manage' : role === 'admin' ? 'admin' : 'user';
+    const redirectTab = role === 'seller' ? 'packages' : role === 'admin' ? 'dashboard' : 'billing';
+    const returnUrl = `${origin}/${dashboardPath}?tab=${redirectTab}&paymentStatus=success&orderCode=${orderCode}`;
+    const cancelUrl = `${origin}/${dashboardPath}?tab=${redirectTab}&paymentStatus=cancel&orderCode=${orderCode}`;
 
     const payOSClient = getPayOS();
     const paymentData = {

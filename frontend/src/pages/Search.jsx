@@ -259,7 +259,7 @@ const Search = () => {
     const fetchListings = async () => {
       try {
         const data = await LocafyApi.getListings({ status: 'approved' });
-        const arr = Array.isArray(data) ? data : (data?.listings ?? []);
+        const arr = Array.isArray(data) ? data : (data?.data ?? data?.listings ?? []);
         setListings(arr.filter((item) => item.status === 'approved'));
       } catch (err) {
         console.error('Search: failed to load listings', err);

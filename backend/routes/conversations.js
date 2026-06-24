@@ -10,9 +10,13 @@ router.get('/', authMiddleware, async (req, res) => {
     const role = req.user.role;
 
     // Tìm tất cả conversations mà user tham gia (theo role)
-    const filter = role === 'seller'
-      ? { seller: userId }
-      : { user: userId };
+    let filter = {};
+    if (role === 'seller') {
+      filter = { seller: userId };
+    } else if (role === 'user') {
+      filter = { user: userId };
+    }
+    // admin: filter rỗng → lấy tất cả
 
     const conversations = await Conversation.find(filter)
       .populate('listing', 'title price imageUrls status')
@@ -29,8 +33,8 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // ── POST / – Tìm hoặc tạo conversation ──────────────────────────────────────
-// Body: { listingId, sellerId } (userId lấy từ token)
-// Hoặc { listingId, userId, sellerId } nếu admin/seller tạo
+// Body: { listingId, sellerId } (userId lấy từ token nếu là user)
+// Hoặc { listingId, userId, sellerId } nếu admin tạo thay user
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { listingId, sellerId, userId: bodyUserId } = req.body;
@@ -39,8 +43,15 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Thiếu sellerId.' });
     }
 
-    // userId: nếu là user thì dùng req.user.id, nếu seller/admin thì dùng bodyUserId
-    const userId = req.user.role === 'user' ? req.user.id : bodyUserId;
+    // userId: user dùng id của mình; admin truyền bodyUserId; seller không được tạo thay user
+    let userId;
+    if (req.user.role === 'user') {
+      userId = req.user.id;
+    } else if (req.user.role === 'admin') {
+      userId = bodyUserId;
+    } else {
+      return res.status(403).json({ error: 'Seller không thể tạo conversation thay người dùng.' });
+    }
     if (!userId) {
       return res.status(400).json({ error: 'Thiếu userId.' });
     }
