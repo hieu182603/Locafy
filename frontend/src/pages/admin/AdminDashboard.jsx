@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LocafyApi } from '../../services/api';
 
@@ -2168,6 +2168,102 @@ const AdminDashboard = () => {
   const currentTab = searchParams.get('tab') || 'dashboard';
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Dropdown states & refs
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef(null);
+
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const notificationDropdownRef = useRef(null);
+
+  const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+      if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
+        setNotificationDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch pending items for the admin notification bell
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchNotifications = async () => {
+      try {
+        const [accountsRes, listingsRes, reportsRes] = await Promise.all([
+          LocafyApi.getAdminAccounts({ role: 'seller', limit: 100 }),
+          LocafyApi.getAdminListings({ status: 'pending', limit: 100 }),
+          LocafyApi.getAdminReports({ limit: 100 })
+        ]);
+
+        const allSellers = accountsRes.data || [];
+        const pendingSellers = allSellers.filter(s => (s.verificationStatus || 'pending') === 'pending');
+        
+        const pendingListings = listingsRes.data || [];
+        
+        const allReports = reportsRes.data || [];
+        const pendingReports = allReports.filter(r => r.status === 'pending' || r.status === 'reviewing');
+
+        const list = [];
+        pendingSellers.forEach(acc => {
+          list.push({
+            id: acc._id || acc.id,
+            type: 'seller',
+            title: 'Yêu cầu xác minh chủ trọ',
+            desc: `${acc.name || acc.username || 'Chủ trọ'} đang chờ duyệt hồ sơ.`,
+            time: 'Chờ duyệt',
+            tab: 'verify-sellers',
+            icon: 'fa-user-check',
+            iconBg: 'bg-admin-50 text-admin-600'
+          });
+        });
+        
+        pendingListings.forEach(l => {
+          list.push({
+            id: l._id || l.id,
+            type: 'listing',
+            title: 'Kiểm duyệt tin đăng',
+            desc: `Tin đăng "${l.title}" đang chờ duyệt.`,
+            time: 'Chờ duyệt',
+            tab: 'listings',
+            icon: 'fa-bed',
+            iconBg: 'bg-amber-50 text-amber-600'
+          });
+        });
+
+        pendingReports.forEach(r => {
+          list.push({
+            id: r._id || r.id,
+            type: 'report',
+            title: 'Báo cáo vi phạm',
+            desc: `Lý do: ${r.reason || 'Nội dung không phù hợp'}.`,
+            time: 'Chờ xử lý',
+            tab: 'reports',
+            icon: 'fa-flag',
+            iconBg: 'bg-rose-50 text-rose-600'
+          });
+        });
+
+        setNotifications(list.slice(0, 5));
+        setNotificationCount(list.length);
+      } catch (err) {
+        console.error('Error fetching admin alerts:', err);
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const setTab = (key) => {
     setSearchParams({ tab: key });
     setSidebarOpen(false);
@@ -2188,106 +2284,187 @@ const AdminDashboard = () => {
   const currentNavItem = NAV_ITEMS.find(n => n.key === currentTab);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-stone-50 font-['Be_Vietnam_Pro',sans-serif]">
-
-      {/* ── Sidebar Overlay (mobile) ── */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* ── SIDEBAR ── */}
-      <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50 w-64 bg-stone-900 text-white shadow-xl flex flex-col py-6
-        transform transition-transform duration-200
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        {/* Brand */}
-        <div className="px-5 mb-6 flex items-center gap-3">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2.5 group">
-            <div className="bg-white/15 group-hover:bg-white/25 transition-colors p-2 rounded-lg">
-              <i className="fa-solid fa-house-chimney text-white text-sm" />
-            </div>
-            <span className="text-lg font-extrabold text-white tracking-tight">Locafy</span>
-          </button>
-          <span className="ml-auto text-[10px] font-bold bg-purple-600/80 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Admin</span>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-2 space-y-1">
-          {NAV_ITEMS.map(item => {
-            const isActive = currentTab === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl mx-0 transition-all text-left ${
-                  isActive
-                    ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-900/30'
-                    : 'text-stone-300 hover:text-white hover:bg-white/10 font-medium'
-                }`}
-              >
-                <i className={`${item.icon} w-4 text-center text-sm`} />
-                <span className="text-sm">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div className="mt-auto px-4 pt-4 border-t border-white/10 mx-2">
+    <div className="w-full h-screen overflow-hidden flex flex-col bg-stone-50 font-['Be_Vietnam_Pro',sans-serif]">
+      {/* ── Top Header ── */}
+      <header className="w-full h-16 bg-white border-b border-gray-150 px-6 flex items-center justify-between shrink-0 z-20 shadow-premium-sm">
+        {/* Left Section: Brand Logo & Title */}
+        <div className="flex items-center gap-2.5">
+          {/* Mobile hamburger */}
           <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-stone-300 hover:text-white hover:bg-white/10 transition-colors rounded-xl text-sm"
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors text-stone-500 mr-1 cursor-pointer"
           >
-            <i className="fa-solid fa-right-from-bracket w-4 text-center" />
-            Đăng xuất
+            <i className="fa-solid fa-bars text-sm" />
           </button>
-        </div>
-      </aside>
-
-      {/* ── MAIN ── */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-
-        {/* Header */}
-        <header className="shrink-0 bg-white/90 backdrop-blur-md border-b border-stone-200/60 flex items-center justify-between h-16 px-6 z-30">
-          <div className="flex items-center gap-3">
-            {/* Mobile hamburger */}
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg hover:bg-stone-100 transition-colors text-stone-600"
-            >
-              <i className="fa-solid fa-bars" />
-            </button>
+          
+          <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition">
+            <div className="w-9 h-9 rounded-lg bg-admin-600 flex items-center justify-center text-white font-extrabold shadow-premium-sm shadow-admin-500/10">
+              <i className="fa-solid fa-house-chimney text-sm" />
+            </div>
             <div>
-              <h1 className="text-base font-extrabold text-stone-900">
-                {currentNavItem?.label || 'Trang Quản Trị Hệ Thống'}
-              </h1>
-              <p className="text-[11px] text-stone-400 hidden sm:block">Trang Quản Trị Hệ Thống Locafy</p>
+              <span className="font-extrabold text-sm tracking-tight text-admin-900 leading-none block">Locafy</span>
+              <span className="text-[9px] block font-bold text-admin-600 uppercase tracking-wider mt-0.5">Kênh Quản Trị</span>
             </div>
+          </Link>
+        </div>
+
+        {/* Right Section: Actions & Profile Dropdown */}
+        <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-admin-50 text-admin-700 text-xs font-bold border-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Hệ thống: Hoạt động
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-stone-800 leading-tight">{user?.name || user?.username || 'Admin'}</p>
-              <p className="text-[11px] text-stone-400">Quản trị viên</p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-              {initials(user?.name || user?.username)}
-            </div>
-          </div>
-        </header>
+          {/* Notification Dropdown Container */}
+          <div className="relative" ref={notificationDropdownRef}>
+            <button
+              onClick={() => setNotificationDropdownOpen(prev => !prev)}
+              className="relative w-9 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition border-0 cursor-pointer focus:outline-none"
+            >
+              <i className="fa-solid fa-bell text-sm" />
+              {notificationCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+              )}
+            </button>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-12">
-            {TAB_COMPONENTS[currentTab] || (
-              <EmptyState icon="fa-circle-question" text="Tab không tồn tại." />
+            {/* Dropdown Menu */}
+            {notificationDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-150 rounded-2xl shadow-xl py-3 z-30 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="px-4 pb-2 border-b border-gray-100 flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-900">Yêu cầu cần xử lý</span>
+                  {notificationCount > 0 && (
+                    <span className="text-[10px] bg-rose-50 text-rose-600 font-bold px-2.5 py-0.5 rounded-full">
+                      {notificationCount} công việc
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-64 overflow-y-auto py-1">
+                  {notifications.length === 0 ? (
+                    <div className="py-8 text-center text-gray-450 text-xs flex flex-col items-center justify-center gap-1.5">
+                      <i className="fa-solid fa-circle-check text-lg text-emerald-500" />
+                      <span>Hệ thống sạch! Không có việc chờ.</span>
+                    </div>
+                  ) : (
+                    notifications.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          setTab(item.tab);
+                          setNotificationDropdownOpen(false);
+                        }}
+                        className="px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer text-left border-b border-gray-50 last:border-0"
+                      >
+                        <div className="flex gap-2.5 items-start">
+                          <div className={`w-8 h-8 rounded-lg ${item.iconBg} flex items-center justify-center shrink-0`}>
+                            <i className={`fa-solid ${item.icon} text-xs`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-gray-800 leading-tight">{item.title}</p>
+                            <p className="text-[11px] text-gray-500 truncate mt-0.5">{item.desc}</p>
+                            <p className="text-[10px] text-admin-600 font-bold mt-1">
+                              <i className="fa-solid fa-clock mr-1" />
+                              {item.time}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             )}
           </div>
-        </main>
+
+          {/* Profile Dropdown Container */}
+          <div className="relative" ref={profileDropdownRef}>
+            <button
+              onClick={() => setProfileDropdownOpen(prev => !prev)}
+              className="flex items-center gap-2.5 p-1 px-2.5 rounded-xl hover:bg-gray-50/80 transition border-0 bg-transparent cursor-pointer text-left focus:outline-none"
+            >
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-admin-500 to-admin-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                {initials(user?.name || user?.username)}
+              </div>
+              <div className="hidden md:block min-w-0">
+                <p className="font-bold text-gray-900 text-xs truncate max-w-[120px] leading-tight">
+                  {user?.name || user?.username || 'Admin'}
+                </p>
+                <p className="text-[10px] text-gray-400 truncate max-w-[120px] mt-0.5 leading-none">
+                  {user?.email || 'admin@locafy.com'}
+                </p>
+              </div>
+              <i className={`fa-solid fa-chevron-down text-[10px] text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {profileDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-150 rounded-2xl shadow-xl py-1 z-30 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Logout Action */}
+                <button
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    logout();
+                    navigate('/');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-red-650 hover:bg-red-50 transition border-0 bg-transparent text-left cursor-pointer font-bold rounded-xl"
+                >
+                  <i className="fa-solid fa-right-from-bracket w-4 text-center" />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main Layout Wrapper under Header ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* ── SIDEBAR ── */}
+        <aside className={`
+          fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-150 flex flex-col py-6
+          transform transition-transform duration-200
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
+          {/* Nav */}
+          <nav className="flex-1 overflow-y-auto px-2 space-y-0.5">
+            {NAV_ITEMS.map(item => {
+              const isActive = currentTab === item.key;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setTab(item.key)}
+                  className={`group w-full flex items-center gap-3 px-4 py-3 rounded-xl mx-0 transition-all text-left border-0 cursor-pointer ${
+                    isActive
+                      ? 'bg-admin-50 text-admin-700 font-extrabold shadow-none border-l-4 border-admin-600 rounded-l-none'
+                      : 'text-gray-650 hover:bg-gray-50/80 hover:text-gray-900 font-bold bg-transparent'
+                  }`}
+                >
+                  <i className={`${item.icon} w-4 text-center text-sm transition-colors ${isActive ? 'text-admin-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <span className="text-sm">{item.label}</span>
+                  {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-admin-500" />}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* ── MAIN CONTENT AREA ── */}
+        <div className="flex-grow h-full flex flex-col min-w-0 bg-stone-50/50">
+          {/* Breadcrumbs internal header */}
+          <div className="px-6 py-4 bg-white border-b border-gray-100 flex items-center gap-2.5 shrink-0 z-10">
+            <span className="text-xs font-bold text-admin-700 uppercase tracking-wider">{currentNavItem?.label || 'Tổng quan'}</span>
+            <span className="text-[10px] text-gray-300">/</span>
+            <span className="text-[10px] text-gray-400 font-medium">Hệ thống Locafy</span>
+          </div>
+
+          <main className="flex-1 overflow-y-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-12">
+              {TAB_COMPONENTS[currentTab] || (
+                <EmptyState icon="fa-circle-question" text="Tab không tồn tại." />
+              )}
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

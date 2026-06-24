@@ -17,8 +17,12 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ── Database Connection ───────────────────────────────────────────────────────
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Successfully connected to MongoDB.'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .then(() => {
+    console.log(`\x1b[32m[✓] MongoDB connected successfully to: ${MONGODB_URI.split('@').pop()}\x1b[0m\n`);
+  })
+  .catch(err => {
+    console.error(`\x1b[31m[✗] MongoDB connection error:\x1b[0m`, err);
+  });
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 // ── PayOS Webhook (phải đặt TRƯỚC express.json để nhận raw body nếu cần) ─────
@@ -135,7 +139,27 @@ io.on('connection', (socket) => {
 // ── Start Server ──────────────────────────────────────────────────────────────
 if (require.main === module || process.env.NODE_ENV !== 'production') {
   server.listen(PORT, () => {
-    console.log(`Locafy Express API Server running on port ${PORT}`);
+    const { isConfigured } = require('./utils/mailer');
+    const smtpStatus = isConfigured() 
+      ? '\x1b[32mConfigured ✓\x1b[0m' 
+      : '\x1b[33mNot Configured (Demo mode) ⚠\x1b[0m';
+    const smtpStatusPlain = isConfigured() ? 'Configured ✓' : 'Not Configured (Demo mode) ⚠';
+
+    const logLine = (label, valPlain, valColored, icon = '•') => {
+      const plainText = `  ${icon} ${label}: ${valPlain}`;
+      const padding = ' '.repeat(Math.max(0, 60 - plainText.length));
+      console.log(`\x1b[36m│\x1b[0m\x1b[1m  ${icon} ${label}:\x1b[0m ${valColored}${padding}\x1b[36m│\x1b[0m`);
+    };
+
+    console.log('\n\x1b[36m┌────────────────────────────────────────────────────────────┐\x1b[0m');
+    console.log('\x1b[36m│\x1b[0m             \x1b[1m\x1b[32mLOCAFY EXPRESS API SERVER RUNNING\x1b[0m              \x1b[36m│\x1b[0m');
+    console.log('\x1b[36m├────────────────────────────────────────────────────────────┤\x1b[0m');
+    logLine('Port', PORT.toString(), PORT.toString());
+    logLine('Env', process.env.NODE_ENV || 'development', process.env.NODE_ENV || 'development');
+    logLine('URL', `http://localhost:${PORT}/api`, `\x1b[4mhttp://localhost:${PORT}/api\x1b[0m`);
+    logLine('Health', `http://localhost:${PORT}/api/health`, `\x1b[4mhttp://localhost:${PORT}/api/health\x1b[0m`);
+    logLine('SMTP Mailer', smtpStatusPlain, smtpStatus);
+    console.log('\x1b[36m└────────────────────────────────────────────────────────────┘\x1b[0m\n');
   });
 }
 
