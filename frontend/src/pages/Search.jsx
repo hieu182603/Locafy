@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { LocafyApi } from '../services/api';
 import ListingCard from '../components/ListingCard';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PAGE_SIZE = 9;
@@ -240,7 +240,7 @@ const Pagination = ({ currentPage, totalPages, onChange }) => {
 
 // ─── Search Component ─────────────────────────────────────────────────────────
 const Search = () => {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
