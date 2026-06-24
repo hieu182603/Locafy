@@ -10,6 +10,7 @@ const router = express.Router();
 const { Listing, Room, Property, Subscription } = require('../models');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { createNotification } = require('./notifications');
+const { getActiveSubscription } = require('../utils/subscriptionHelper');
 
 function requireSeller(req, res, next) {
   if (req.user.role !== 'seller') {
@@ -145,7 +146,7 @@ router.post('/', authMiddleware, requireSeller, async (req, res) => {
 
     // Kiểm tra hạn mức listing theo gói (chỉ khi gửi duyệt, không phải nháp)
     if (!asDraft) {
-      const sub = await Subscription.findOne({ account: req.user.id, status: 'active' });
+      const sub = await getActiveSubscription(req.user.id);
       if (sub && sub.remainingListings !== null && sub.remainingListings <= 0) {
         return res.status(403).json({
           error: 'Bạn đã hết hạn mức tin đăng. Vui lòng nâng cấp gói dịch vụ.',
@@ -234,7 +235,7 @@ router.patch('/:id/submit', authMiddleware, requireSeller, async (req, res) => {
 
     // Kiểm tra hạn mức (chỉ lần đầu từ draft)
     if (listing.status === 'draft') {
-      const sub = await Subscription.findOne({ account: req.user.id, status: 'active' });
+      const sub = await getActiveSubscription(req.user.id);
       if (sub && sub.remainingListings !== null && sub.remainingListings <= 0) {
         return res.status(403).json({ error: 'Đã hết hạn mức tin đăng. Vui lòng nâng cấp gói.' });
       }
@@ -289,7 +290,7 @@ router.patch('/:id/boost', authMiddleware, requireSeller, async (req, res) => {
     }
 
     // Kiểm tra còn boostCredit không
-    const sub = await Subscription.findOne({ account: req.user.id, status: 'active' });
+    const sub = await getActiveSubscription(req.user.id);
     if (!sub || sub.remainingBoostCredits <= 0) {
       return res.status(403).json({ error: 'Không còn lượt đẩy tin. Vui lòng nâng cấp gói.' });
     }
@@ -318,7 +319,7 @@ router.patch('/:id/pin', authMiddleware, requireSeller, async (req, res) => {
       return res.status(400).json({ error: 'Chỉ ghim được tin đã duyệt.' });
     }
 
-    const sub = await Subscription.findOne({ account: req.user.id, status: 'active' });
+    const sub = await getActiveSubscription(req.user.id);
     if (!sub || sub.remainingPinCredits <= 0) {
       return res.status(403).json({ error: 'Không còn lượt ghim tin. Vui lòng nâng cấp gói.' });
     }
@@ -347,7 +348,7 @@ router.patch('/:id/refresh', authMiddleware, requireSeller, async (req, res) => 
       return res.status(400).json({ error: 'Chỉ làm mới được tin đã duyệt.' });
     }
 
-    const sub = await Subscription.findOne({ account: req.user.id, status: 'active' });
+    const sub = await getActiveSubscription(req.user.id);
     if (!sub || sub.remainingRefreshCredits <= 0) {
       return res.status(403).json({ error: 'Không còn lượt làm mới. Vui lòng nâng cấp gói.' });
     }

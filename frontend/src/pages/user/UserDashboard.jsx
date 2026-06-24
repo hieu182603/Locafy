@@ -1129,6 +1129,78 @@ function FavoritesTab() {
   );
 }
 
+// ─── Tab: Saved Searches ─────────────────────────────────────────────────────
+
+function SavedSearchesTab() {
+  const [searches, setSearches] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    LocafyApi.getSavedSearches()
+      .then(res => setSearches(res.data || []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDelete = async (id) => {
+    try {
+      await LocafyApi.deleteSavedSearch(id);
+      setSearches(prev => prev.filter(s => s._id !== id));
+    } catch { alert('Không thể xóa.'); }
+  };
+
+  const buildSearchUrl = (s) => {
+    const p = new URLSearchParams();
+    const f = s.filters || {};
+    if (f.keyword) p.set('q', f.keyword);
+    if (f.district) p.set('district', f.district);
+    if (f.roomType) p.set('type', f.roomType);
+    if (f.priceRange) p.set('price', f.priceRange);
+    if (f.areaRange) p.set('area', f.areaRange);
+    return `/phong-tro?${p.toString()}`;
+  };
+
+  if (loading) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600" /></div>;
+
+  return (
+    <div>
+      <h2 className="text-lg font-extrabold text-gray-900 mb-1">Tìm kiếm đã lưu</h2>
+      <p className="text-sm text-gray-400 mb-6">Nhấn vào một tìm kiếm để xem lại kết quả ngay.</p>
+
+      {searches.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <i className="fa-regular fa-bookmark text-4xl mb-3 block" />
+          <p className="font-semibold">Chưa có tìm kiếm nào được lưu</p>
+          <p className="text-xs mt-1">Trên trang tìm kiếm, nhấn "Lưu tìm kiếm" để lưu bộ lọc của bạn.</p>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {searches.map(s => (
+            <div key={s._id} className="bg-white border border-gray-100 rounded-2xl p-4 flex items-start justify-between gap-3 shadow-sm hover:border-blue-200 transition">
+              <a href={buildSearchUrl(s)} className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-sm truncate">{s.name || 'Tìm kiếm không tên'}</p>
+                <p className="text-xs text-gray-400 mt-1 truncate">
+                  {Object.entries(s.filters || {}).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ') || 'Tất cả'}
+                </p>
+                <p className="text-[11px] text-gray-300 mt-1">
+                  {new Date(s.createdAt).toLocaleDateString('vi-VN')}
+                </p>
+              </a>
+              <button
+                onClick={() => handleDelete(s._id)}
+                className="p-1.5 text-gray-300 hover:text-red-500 transition shrink-0"
+                title="Xóa"
+              >
+                <i className="fa-solid fa-trash-can text-sm" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Tab: Notifications ──────────────────────────────────────────────────────
 
 function NotificationsTab() {
@@ -1577,6 +1649,7 @@ const UserDashboard = () => {
       items: [
         { tab: 'appointments', icon: 'fa-calendar-check', label: 'Lịch hẹn xem phòng' },
         { tab: 'favorites', icon: 'fa-heart', label: 'Tin đã lưu' },
+        { tab: 'saved-searches', icon: 'fa-bookmark', label: 'Tìm kiếm đã lưu' },
         { tab: 'history', icon: 'fa-clock-rotate-left', label: 'Lịch sử đã xem' },
       ]
     },
@@ -1686,6 +1759,7 @@ const UserDashboard = () => {
             {currentTab === 'preferences' && <PreferencesTab />}
             {currentTab === 'appointments' && <AppointmentsTab />}
             {currentTab === 'favorites' && <FavoritesTab />}
+            {currentTab === 'saved-searches' && <SavedSearchesTab />}
             {currentTab === 'history' && <ViewHistoryTab />}
             {currentTab === 'notifications' && <NotificationsTab />}
             {currentTab === 'chats' && (

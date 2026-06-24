@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { LocafyApi } from '../services/api';
 import ListingCard from '../components/ListingCard';
+import { AuthContext } from '../context/AuthContext';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PAGE_SIZE = 9;
@@ -239,11 +240,13 @@ const Pagination = ({ currentPage, totalPages, onChange }) => {
 
 // ─── Search Component ─────────────────────────────────────────────────────────
 const Search = () => {
+  const { user } = useContext(AuthContext);
   const [searchParams, setSearchParams] = useSearchParams();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [showFilters, setShowFilters] = useState(false);
+  const [savedSearchMsg, setSavedSearchMsg] = useState('');
 
   // Controlled filter state synced to URL
   const [searchTerm, setSearchTermLocal] = useState(searchParams.get('q') || '');
@@ -323,6 +326,35 @@ const Search = () => {
     setSortByLocal('newest');
     setSearchParams({}, { replace: true });
     setCurrentPage(1);
+  };
+
+  // ── Save current search ──
+  const handleSaveSearch = async () => {
+    if (!user) { window.location.href = '/dang-nhap'; return; }
+    const filters = {};
+    if (searchTerm) filters.keyword = searchTerm;
+    if (districtFilter) filters.district = districtFilter;
+    if (roomTypeFilter !== 'all') filters.roomType = roomTypeFilter;
+    if (priceFilter !== 'all') filters.priceRange = priceFilter;
+    if (areaFilter !== 'all') filters.areaRange = areaFilter;
+
+    if (Object.keys(filters).length === 0) {
+      setSavedSearchMsg('Vui lòng đặt ít nhất một bộ lọc trước khi lưu.');
+      setTimeout(() => setSavedSearchMsg(''), 3000);
+      return;
+    }
+
+    try {
+      const name = [
+        searchTerm || districtFilter || 'Tìm kiếm',
+        roomTypeFilter !== 'all' ? roomTypeFilter : '',
+      ].filter(Boolean).join(' · ');
+      await LocafyApi.createSavedSearch({ name, filters });
+      setSavedSearchMsg('✓ Đã lưu tìm kiếm thành công!');
+    } catch (err) {
+      setSavedSearchMsg(err.message || 'Không thể lưu tìm kiếm.');
+    }
+    setTimeout(() => setSavedSearchMsg(''), 3000);
   };
 
   // ── Filtering & sorting ──
@@ -459,13 +491,28 @@ const Search = () => {
                 : `Hiển thị ${paginated.length} / ${filteredListings.length} kết quả • Danh sách nhà trọ, căn hộ và chung cư mini gần khu vực`}
             </p>
           </div>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-full border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition self-start md:self-auto"
-          >
-            <i className="fa-solid fa-arrow-left-long mr-2" />
-            Quay lại
-          </Link>
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            {savedSearchMsg && (
+              <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${savedSearchMsg.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {savedSearchMsg}
+              </span>
+            )}
+            <button
+              onClick={handleSaveSearch}
+              className="inline-flex items-center justify-center rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition"
+              title="Lưu bộ lọc này để xem lại sau"
+            >
+              <i className="fa-regular fa-bookmark mr-2" />
+              Lưu tìm kiếm
+            </button>
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center rounded-full border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition"
+            >
+              <i className="fa-solid fa-arrow-left-long mr-2" />
+              Quay lại
+            </Link>
+          </div>
         </div>
 
         {/* ── Advanced filter panel ── */}
