@@ -32,6 +32,5 @@ const ArticleSchema = new mongoose.Schema(
 );
 
 ArticleSchema.index({ type: 1, isPublished: 1, sortOrder: 1 });
-ArticleSchema.index({ slug: 1 }, { unique: true });
 
 module.exports = mongoose.model('Article', ArticleSchema);

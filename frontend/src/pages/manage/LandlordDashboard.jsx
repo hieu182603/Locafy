@@ -30,6 +30,50 @@ const ROOM_TYPE_LABELS = {
   apartment: 'Căn hộ nguyên căn',
 };
 
+const CHART_DATA_OPTIONS = {
+  '7-days': {
+    totalViews: '201 lượt',
+    growth: '+18.5%',
+    contacts: 14,
+    convRate: '6.9%',
+    items: [
+      { label: 'Thứ 2', h: 35, views: '12 lượt' },
+      { label: 'Thứ 3', h: 50, views: '19 lượt' },
+      { label: 'Thứ 4', h: 42, views: '15 lượt' },
+      { label: 'Thứ 5', h: 75, views: '32 lượt' },
+      { label: 'Thứ 6', h: 65, views: '28 lượt' },
+      { label: 'Thứ 7', h: 90, views: '45 lượt' },
+      { label: 'CN', h: 100, views: '50 lượt', active: true }
+    ]
+  },
+  '4-weeks': {
+    totalViews: '1,104 lượt',
+    growth: '+24.2%',
+    contacts: 48,
+    convRate: '4.3%',
+    items: [
+      { label: 'Tuần 1', h: 35, views: '124 lượt' },
+      { label: 'Tuần 2', h: 58, views: '210 lượt' },
+      { label: 'Tuần 3', h: 80, views: '320 lượt' },
+      { label: 'Tuần 4', h: 100, views: '450 lượt', active: true }
+    ]
+  },
+  '6-months': {
+    totalViews: '7,020 lượt',
+    growth: '+14.8%',
+    contacts: 295,
+    convRate: '4.2%',
+    items: [
+      { label: 'Tháng 1', h: 50, views: '820 lượt' },
+      { label: 'Tháng 2', h: 60, views: '950 lượt' },
+      { label: 'Tháng 3', h: 70, views: '1,100 lượt' },
+      { label: 'Tháng 4', h: 82, views: '1,300 lượt' },
+      { label: 'Tháng 5', h: 78, views: '1,250 lượt' },
+      { label: 'Tháng 6', h: 100, views: '1,600 lượt', active: true }
+    ]
+  }
+};
+
 const TAB_GROUPS = [
   {
     title: 'Hoạt động',
@@ -182,6 +226,28 @@ const LandlordDashboard = () => {
   const currentTab = searchParams.get('tab') || 'overview';
   const editId = searchParams.get('editId') || '';
 
+  // Profile Dropdown state & ref
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef(null);
+
+  // Notification Dropdown state & ref
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const notificationDropdownRef = useRef(null);
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+      if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
+        setNotificationDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Custom Toast State and Auto-detect Type
   const [toast, setToast] = useState(null);
   const alert = useCallback((msg, type = 'success') => {
@@ -326,6 +392,8 @@ const LandlordDashboard = () => {
   const [verifyContactAddress, setVerifyContactAddress] = useState('');
 
   // ── Overview stats ───────────────────────────────────────────────────────────
+  const [chartFilter, setChartFilter] = useState('4-weeks');
+  const selectedData = CHART_DATA_OPTIONS[chartFilter] || CHART_DATA_OPTIONS['4-weeks'];
   const [overviewStats, setOverviewStats] = useState({
     totalListings: 0, activeListings: 0,
     pendingAppts: 0, revenue: 0,
@@ -1108,86 +1176,194 @@ const LandlordDashboard = () => {
   //  RENDER
   // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div className="w-full h-screen overflow-hidden flex bg-gray-50" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
-      {/* ── Sidebar ── */}
-      <aside className="w-64 border-r border-gray-150 bg-white flex flex-col justify-between shrink-0 h-full p-5">
-        <div className="flex flex-col flex-grow overflow-hidden">
-          {/* Brand Logo & Title */}
-          <div className="flex items-center gap-2.5 px-3 py-4 mb-4 border-b border-gray-50 shrink-0">
-            <Link to="/" className="flex items-center gap-2.5 text-seller-700 hover:opacity-90 transition">
-              <div className="w-9 h-9 rounded-xl bg-seller-600 flex items-center justify-center text-white font-extrabold shadow-premium-sm shadow-seller-500/10">
-                <i className="fa-solid fa-house-chimney text-base" />
-              </div>
-              <div>
-                <span className="font-extrabold text-base tracking-tight text-gray-900 leading-none block">Locafy</span>
-                <span className="text-[10px] block font-bold text-seller-600 uppercase tracking-wider mt-0.5">Kênh Chủ Trọ</span>
-              </div>
-            </Link>
-          </div>
+    <div className="w-full h-screen overflow-hidden flex flex-col bg-gray-50" style={{ fontFamily: "'Be Vietnam Pro', sans-serif" }}>
+      {/* ── Top Header ── */}
+      <header className="w-full h-16 bg-white border-b border-gray-150 px-6 flex items-center justify-between shrink-0 z-20 shadow-premium-sm">
+        {/* Brand Logo & Title */}
+        <div className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition">
+            <div className="w-9 h-9 rounded-lg bg-seller-600 flex items-center justify-center text-white font-extrabold shadow-premium-sm shadow-seller-500/10">
+              <i className="fa-solid fa-house-chimney text-sm" />
+            </div>
+            <div>
+              <span className="font-extrabold text-sm tracking-tight text-seller-900 leading-none block">Locafy</span>
+              <span className="text-[9px] block font-bold text-seller-600 uppercase tracking-wider mt-0.5">Kênh Chủ Trọ</span>
+            </div>
+          </Link>
+        </div>
 
-          {/* Categorized Navigation items */}
-          <nav className="flex-1 space-y-5 overflow-y-auto px-1">
-            {TAB_GROUPS.map((group, groupIdx) => (
-              <div key={groupIdx} className="space-y-1">
-                <p className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.title}</p>
-                <div className="space-y-0.5">
-                  {group.items.map(tab => {
-                    const isActive = currentTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => goTab(tab.id)}
-                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer border-0 ${isActive
-                            ? 'bg-seller-600 text-white shadow-premium-md shadow-seller-500/20 active:scale-[0.98]'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-seller-700'
-                          }`}
-                      >
-                        <i className={`fa-solid ${tab.icon} w-4 text-center text-sm`} />
-                        <span className="flex-grow">{tab.label}</span>
-                        {tab.id === 'verify' && verifyStatus !== 'approved' && (
-                          <span className="ml-auto w-2 h-2 rounded-full bg-amber-400" />
-                        )}
-                      </button>
-                    );
-                  })}
+        {/* Right side: Actions & Profile Dropdown */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => goTab('add-listing')}
+            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-seller-50 text-seller-700 text-xs font-bold hover:bg-seller-100 transition active:scale-95 border-0 cursor-pointer"
+          >
+            <i className="fa-solid fa-circle-plus" />
+            <span>Tạo tin mới</span>
+          </button>
+
+          {/* Notification Dropdown Container */}
+          <div className="relative" ref={notificationDropdownRef}>
+            <button
+              onClick={() => setNotificationDropdownOpen(prev => !prev)}
+              className="relative w-9 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition border-0 cursor-pointer focus:outline-none"
+            >
+              <i className="fa-solid fa-bell text-sm" />
+              {appointments.filter(a => a.status === 'pending').length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+              )}
+            </button>
+
+            {/* Dropdown Menu */}
+            {notificationDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-150 rounded-2xl shadow-xl py-3 z-30 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="px-4 pb-2 border-b border-gray-100 flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-900">Thông báo mới</span>
+                  {appointments.filter(a => a.status === 'pending').length > 0 && (
+                    <span className="text-[10px] bg-rose-50 text-rose-600 font-bold px-2.5 py-0.5 rounded-full">
+                      {appointments.filter(a => a.status === 'pending').length} chờ duyệt
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-64 overflow-y-auto py-1">
+                  {appointments.filter(a => a.status === 'pending').length === 0 ? (
+                    <div className="py-8 text-center text-gray-450 text-xs flex flex-col items-center justify-center gap-1.5">
+                      <i className="fa-solid fa-bell-slash text-base text-gray-300" />
+                      <span>Không có thông báo mới.</span>
+                    </div>
+                  ) : (
+                    appointments.filter(a => a.status === 'pending').slice(0, 5).map(appt => {
+                      const id = appt._id || appt.id;
+                      return (
+                        <div
+                          key={id}
+                          onClick={() => {
+                            goTab('appointments');
+                            setNotificationDropdownOpen(false);
+                          }}
+                          className="px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer text-left border-b border-gray-50 last:border-0"
+                        >
+                          <div className="flex gap-2.5 items-start">
+                            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                              <i className="fa-solid fa-calendar-check text-xs" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-gray-800 leading-tight">Yêu cầu xem phòng trọ</p>
+                              <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                                <strong>{appt.tenantName || appt.visitorName}</strong> hẹn xem <strong>{appt.roomTitle || appt.listingTitle}</strong>
+                              </p>
+                              <p className="text-[10px] text-seller-600 font-bold mt-1">
+                                <i className="fa-solid fa-clock mr-1" />
+                                {appt.date} · {appt.time}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="px-4 pt-2.5 border-t border-gray-100">
+                  <button
+                    onClick={() => {
+                      goTab('appointments');
+                      setNotificationDropdownOpen(false);
+                    }}
+                    className="w-full text-center text-xs font-bold text-seller-600 hover:text-seller-700 bg-transparent border-0 cursor-pointer"
+                  >
+                    Xem tất cả lịch hẹn →
+                  </button>
                 </div>
               </div>
-            ))}
-          </nav>
-        </div>
-
-        {/* Sidebar Bottom Profile/Actions */}
-        <div className="pt-4 border-t border-gray-150 space-y-2 mt-auto shrink-0">
-          {/* User profile row */}
-          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} className="w-8.5 h-8.5 rounded-lg object-cover shrink-0 shadow-sm" />
-            ) : (
-              <div className="w-8.5 h-8.5 rounded-lg bg-gradient-to-br from-seller-500 to-seller-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
-                {getInitials(user?.name || user?.username)}
-              </div>
             )}
-            <div className="min-w-0 flex-1">
-              <p className="font-bold text-gray-900 text-[13px] truncate leading-tight">{user?.name || user?.username || '—'}</p>
-              <p className="text-[10px] text-gray-400 truncate mt-0.5 leading-none">{user?.email}</p>
-            </div>
           </div>
 
-          {/* Log out */}
-          <button
-            onClick={() => {
-              logout();
-              navigate('/');
-            }}
-            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-all text-center cursor-pointer bg-white"
-          >
-            <i className="fa-solid fa-right-from-bracket text-[10px]" /> Đăng xuất
-          </button>
-        </div>
-      </aside>
+          {/* Profile Dropdown Container */}
+          <div className="relative" ref={profileDropdownRef}>
+            <button
+              onClick={() => setProfileDropdownOpen(prev => !prev)}
+              className="flex items-center gap-2.5 p-1 px-2.5 rounded-xl hover:bg-gray-50/80 transition border-0 bg-transparent cursor-pointer text-left focus:outline-none"
+            >
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-lg object-cover shrink-0 shadow-sm" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-seller-500 to-seller-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                  {getInitials(user?.name || user?.username)}
+                </div>
+              )}
+              <div className="hidden md:block min-w-0">
+                <p className="font-bold text-gray-900 text-xs truncate max-w-[120px] leading-tight">
+                  {user?.name || user?.username || '—'}
+                </p>
+                <p className="text-[10px] text-gray-400 truncate max-w-[120px] mt-0.5 leading-none">
+                  {user?.email}
+                </p>
+              </div>
+              <i className={`fa-solid fa-chevron-down text-[10px] text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-      {/* ── Main content area ── */}
-      <div className="flex-grow h-full flex flex-col min-w-0">
+            {/* Dropdown Menu */}
+            {profileDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-150 rounded-2xl shadow-xl py-1 z-30 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Logout Action */}
+                <button
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    logout();
+                    navigate('/');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-red-650 hover:bg-red-50 transition border-0 bg-transparent text-left cursor-pointer font-bold rounded-xl"
+                >
+                  <i className="fa-solid fa-right-from-bracket w-4 text-center" />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main Layout Wrapper under Header ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* ── Sidebar ── */}
+        <aside className="w-64 border-r border-gray-150 bg-white flex flex-col justify-between shrink-0 h-full p-4">
+          <div className="flex flex-col flex-grow overflow-hidden">
+            {/* Categorized Navigation items */}
+            <nav className="flex-1 space-y-4 overflow-y-auto px-1 no-scrollbar">
+              {TAB_GROUPS.map((group, groupIdx) => (
+                <div key={groupIdx} className="space-y-1 mt-4 first:mt-0">
+                  <p className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{group.title}</p>
+                  <div className="space-y-0.5">
+                    {group.items.map(tab => {
+                      const isActive = currentTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => goTab(tab.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold transition-all text-left cursor-pointer border-0 ${isActive
+                              ? 'bg-seller-50 text-seller-700 font-extrabold shadow-none active:scale-[0.98]'
+                              : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900'
+                            }`}
+                        >
+                          <i className={`fa-solid ${tab.icon} w-4 text-center text-sm ${isActive ? 'text-seller-600' : 'text-gray-400'}`} />
+                          <span className="flex-grow">{tab.label}</span>
+                          {tab.id === 'verify' && verifyStatus !== 'approved' && (
+                            <span className="ml-auto w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+          </div>
+        </aside>
+
+        {/* ── Main content area ── */}
+        <div className="flex-grow h-full flex flex-col min-w-0 bg-gray-50/50">
         {/* Verification banner if present */}
         {verifyStatus !== 'approved' && (
           <div className="px-6 pt-6 shrink-0">
@@ -1195,7 +1371,7 @@ const LandlordDashboard = () => {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-gray-50/50">
+        <main className={`flex-1 ${currentTab === 'chats' ? 'flex flex-col overflow-hidden p-0' : 'overflow-y-auto p-6 md:p-10'} bg-gray-50/50`}>
 
           {/* ════════════ TAB: OVERVIEW ════════════ */}
           {currentTab === 'overview' && (
@@ -1253,34 +1429,90 @@ const LandlordDashboard = () => {
                     <h3 className="font-extrabold text-gray-900 text-sm">Hiệu quả đăng tin</h3>
                     <p className="text-[11px] text-gray-400 mt-0.5">Số lượt xem tin đăng & liên hệ trực tuyến</p>
                   </div>
-                  <span className="text-xs font-bold text-seller-700 bg-seller-50 border border-seller-100 px-3 py-1 rounded-full">4 tuần qua</span>
-                </div>
-                <div className="flex items-end justify-between gap-4 h-36 px-2">
-                  {[
-                    { h: 35, label: 'Tuần 1', views: '124 lượt' },
-                    { h: 58, label: 'Tuần 2', views: '210 lượt' },
-                    { h: 80, label: 'Tuần 3', views: '320 lượt' },
-                    { h: 95, label: 'Tuần 4', views: '450 lượt', active: true }
-                  ].map((item, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-2 group relative">
-                      {/* Tooltip on hover */}
-                      <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md whitespace-nowrap z-10">
-                        {item.views}
-                      </div>
-                      <div className="w-full bg-gray-50 rounded-xl h-28 flex items-end overflow-hidden border border-gray-100/50">
-                        <div
-                          className={`w-full rounded-t-lg transition-all duration-700 origin-bottom scale-y-100 group-hover:scale-y-[1.02] ${item.active
-                              ? 'bg-gradient-to-t from-emerald-600 to-teal-500'
-                              : 'bg-seller-100 group-hover:bg-seller-200'
-                            }`}
-                          style={{ height: `${item.h}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] font-bold ${item.active ? 'text-seller-700' : 'text-gray-400'}`}>
-                        {item.label}
-                      </span>
+                  
+                  {/* Styled Filter Select */}
+                  <div className="relative">
+                    <select
+                      value={chartFilter}
+                      onChange={(e) => setChartFilter(e.target.value)}
+                      className="appearance-none text-xs font-bold text-seller-700 bg-seller-50 border border-seller-150 pl-3 pr-8 py-1.5 rounded-xl cursor-pointer hover:bg-seller-100/70 hover:border-seller-200 transition focus:outline-none focus:ring-2 focus:ring-seller-500/20"
+                    >
+                      <option value="7-days">7 ngày qua</option>
+                      <option value="4-weeks">4 tuần qua</option>
+                      <option value="6-months">6 tháng qua</option>
+                    </select>
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-seller-650 text-[9px]">
+                      <i className="fa-solid fa-chevron-down" />
                     </div>
-                  ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6">
+                  {/* Left Column: Summary Info */}
+                  <div className="bg-linear-to-br from-seller-50/50 to-emerald-50/10 rounded-2xl p-5 border border-seller-100/50 flex flex-col justify-between min-h-[140px] hover:shadow-inner transition-all duration-300">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Tổng lượt xem</span>
+                      <div className="flex items-baseline gap-2 mt-1.5">
+                        <span className="text-3xl font-black text-seller-900 tracking-tight">{selectedData.totalViews}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-emerald-600 bg-emerald-100/60 border border-emerald-200/50 px-2 py-0.5 rounded-full">
+                          <i className="fa-solid fa-caret-up text-[9px]" />
+                          {selectedData.growth}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-seller-100/60 pt-4 mt-4 grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[9px] font-bold text-gray-400 block uppercase tracking-wide">Liên hệ</span>
+                        <span className="text-xs font-black text-gray-700">{selectedData.contacts} lượt</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-gray-400 block uppercase tracking-wide">Tỷ lệ chuyển đổi</span>
+                        <span className="text-xs font-black text-gray-700">{selectedData.convRate}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Dynamic Bar Chart */}
+                  <div className="relative h-36 flex flex-col justify-end">
+                    {/* Background grid lines */}
+                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-7">
+                      <div className="border-b border-dashed border-gray-100 w-full" />
+                      <div className="border-b border-dashed border-gray-100 w-full" />
+                      <div className="border-b border-dashed border-gray-100 w-full" />
+                      <div className="border-b border-dashed border-gray-100 w-full" />
+                    </div>
+
+                    <div className="relative z-10 flex items-end justify-between gap-3 md:gap-4 h-28 px-2 w-full">
+                      {selectedData.items.map((item, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-2 group relative h-full justify-end">
+                          {/* Tooltip on hover */}
+                          <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none bg-gray-900/95 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-xl shadow-lg whitespace-nowrap z-10 border border-gray-800">
+                            {item.views}
+                          </div>
+                          
+                          {/* Column bar container */}
+                          <div className="w-full max-w-[32px] bg-gray-50/60 rounded-t-xl h-full flex items-end overflow-hidden border border-gray-100/40 relative cursor-pointer">
+                            {/* Background highlight on hover */}
+                            <div className="absolute inset-0 bg-seller-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-t-xl" />
+                            
+                            <div
+                              className={`w-full rounded-t-lg transition-all duration-500 origin-bottom scale-y-100 ${item.active
+                                  ? 'bg-gradient-to-t from-seller-600 to-seller-400 shadow-md shadow-seller-600/30'
+                                  : 'bg-seller-200 group-hover:bg-seller-300/90'
+                                }`}
+                              style={{ height: `${item.h}%` }}
+                            />
+                          </div>
+                          
+                          {/* Column label */}
+                          <span className={`text-[10px] font-bold whitespace-nowrap transition-colors ${item.active ? 'text-seller-700' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -2361,23 +2593,25 @@ const LandlordDashboard = () => {
 
           {/* ════════════ TAB: CHATS ════════════ */}
           {currentTab === 'chats' && (
-            <div>
-              <h2 className="text-lg font-extrabold text-gray-900 mb-5">Hộp thư tin nhắn</h2>
-              <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden flex h-[calc(100vh-230px)] min-h-[500px] shadow-premium-sm">
+            <div className="flex-grow flex flex-col min-h-0">
+              <div className="bg-white flex flex-grow min-h-0 overflow-hidden">
                 {/* Conversation list */}
-                <div className="w-72 shrink-0 border-r border-gray-100 bg-gray-50/50 flex flex-col">
-                  <div className="px-4 py-4 border-b border-gray-100 bg-white shrink-0">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hội thoại</p>
+                <div className="w-80 shrink-0 border-r border-gray-100 bg-gray-50/30 flex flex-col min-h-0">
+                  <div className="px-5 py-4 border-b border-gray-100 bg-white shrink-0 flex justify-between items-center">
+                    <p className="text-xs font-bold text-gray-800 uppercase tracking-wider">Hội thoại</p>
+                    <span className="bg-seller-100 text-seller-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      {conversations.length}
+                    </span>
                   </div>
-                  <div className="flex-grow overflow-y-auto divide-y divide-gray-50 bg-white">
+                  <div className="flex-grow overflow-y-auto p-2 space-y-1 bg-white scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                     {loading ? (
                       <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-seller-500 border-t-transparent rounded-full animate-spin" /></div>
                     ) : conversations.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                        <div className="w-10 h-10 rounded-xl bg-gray-150 flex items-center justify-center mb-2">
-                          <i className="fa-solid fa-message text-gray-400 text-sm" />
+                      <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-150 flex items-center justify-center mb-2">
+                          <i className="fa-solid fa-message text-gray-455 text-sm animate-pulse" />
                         </div>
-                        <p className="text-xs text-gray-400 font-medium">Chưa có hội thoại nào</p>
+                        <p className="text-xs text-gray-400 font-bold">Chưa có hội thoại nào</p>
                       </div>
                     ) : conversations.map(conv => {
                       const convId = conv._id || conv.id;
@@ -2388,21 +2622,21 @@ const LandlordDashboard = () => {
                         <button
                           key={convId}
                           onClick={() => { selectConversation(conv); }}
-                          className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-all border-0 cursor-pointer ${isActive
-                              ? 'bg-seller-50/60 text-seller-800 font-bold border-l-3 border-l-seller-600'
-                              : 'bg-transparent text-gray-600 hover:bg-gray-100/50'
+                          className={`w-full text-left px-3 py-3 flex items-center gap-3 transition-all rounded-xl border-0 cursor-pointer ${isActive
+                              ? 'bg-seller-50/80 text-seller-900 font-bold shadow-xs'
+                              : 'bg-transparent text-gray-600 hover:bg-gray-50'
                             }`}
                         >
                           {renterAvatar ? (
                             <img src={renterAvatar} alt="avatar" className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-100" />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-seller-100 to-seller-200 text-seller-700 flex items-center justify-center text-xs font-black shrink-0 border border-seller-200/20">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-seller-100 to-seller-200 text-seller-700 flex items-center justify-center text-xs font-black shrink-0 border border-seller-200/20 shadow-sm">
                               {renterName.substring(0, 2).toUpperCase()}
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-baseline mb-0.5">
-                              <p className={`text-xs truncate ${isActive ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
+                              <p className={`text-xs truncate ${isActive ? 'font-extrabold text-gray-900' : 'font-bold text-gray-700'}`}>
                                 {renterName}
                               </p>
                               {conv.lastMessageAt && (
@@ -2411,12 +2645,12 @@ const LandlordDashboard = () => {
                                 </span>
                               )}
                             </div>
-                            <p className={`text-[11px] truncate ${isActive ? 'text-seller-700 font-medium' : 'text-gray-400'}`}>
+                            <p className={`text-[11px] truncate ${isActive ? 'text-seller-700 font-medium' : 'text-gray-450'}`}>
                               {conv.lastMessage || 'Bắt đầu trò chuyện...'}
                             </p>
                           </div>
                           {conv.unreadBySeller > 0 && (
-                            <span className="w-2 h-2 rounded-full bg-seller-500 shrink-0" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-seller-500 shrink-0 shadow-sm shadow-seller-500/20" />
                           )}
                         </button>
                       );
@@ -2425,7 +2659,7 @@ const LandlordDashboard = () => {
                 </div>
 
                 {/* Chat panel */}
-                <div className="flex-1 flex flex-col bg-white min-w-0">
+                <div className="flex-grow flex flex-col bg-white min-w-0 min-h-0">
                   {activeChatId ? (
                     <>
                       {/* Header */}
@@ -2433,19 +2667,22 @@ const LandlordDashboard = () => {
                         const rName = activeConv?.user?.name || 'Khách';
                         const rAvatar = activeConv?.user?.avatarUrl;
                         return (
-                          <div className="px-5 py-4 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
+                          <div className="px-5 py-3.5 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-3">
                               {rAvatar ? (
-                                <img src={rAvatar} alt={rName} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                                <img src={rAvatar} alt={rName} className="w-10 h-10 rounded-full object-cover shrink-0 border border-gray-100 shadow-sm" />
                               ) : (
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-seller-500 to-seller-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-seller-500/10">
                                   {rName.substring(0, 2).toUpperCase()}
                                 </div>
                               )}
                               <div>
-                                <p className="font-extrabold text-gray-900 text-sm">{rName}</p>
+                                <p className="font-extrabold text-gray-900 text-sm leading-tight">{rName}</p>
                                 {activeConv?.listing?.title && (
-                                  <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{activeConv.listing.title}</p>
+                                  <p className="text-[10px] text-gray-400 truncate max-w-[300px] mt-0.5 leading-none">
+                                    <i className="fa-solid fa-house-circle-check mr-1 text-[9px] text-seller-500" />
+                                    {activeConv.listing.title}
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -2454,25 +2691,25 @@ const LandlordDashboard = () => {
                       })()}
 
                       {/* Messages */}
-                      <div className="flex-grow overflow-y-auto p-5 space-y-4 bg-gray-50/30">
+                      <div className="flex-grow overflow-y-auto p-5 space-y-4 bg-gray-50/20 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                         {loadingMsgs ? (
                           <div className="flex justify-center pt-10"><div className="w-6 h-6 border-2 border-seller-200 border-t-seller-600 rounded-full animate-spin" /></div>
                         ) : chatMessages.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center py-16 text-center">
+                          <div className="flex flex-col items-center justify-center py-20 text-center">
                             <div className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center mb-3 shadow-premium-sm">
                               <i className="fa-solid fa-comments text-seller-500 text-lg animate-bounce" />
                             </div>
                             <p className="text-xs text-gray-400 font-bold">Bắt đầu cuộc trò chuyện!</p>
-                            <p className="text-[10px] text-gray-300 mt-0.5">Hãy chào khách một tiếng thật ấm áp nhé.</p>
+                            <p className="text-[10px] text-gray-355 mt-0.5">Hãy chào khách một tiếng thật ấm áp nhé.</p>
                           </div>
                         ) : chatMessages.map((m, i) => {
                           const myId = user?._id || user?.id || '';
                           const mine = String(m.sender?._id || m.sender || '') === String(myId);
                           return (
                             <div key={m._id || i} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-[12.5px] shadow-premium-sm ${mine
-                                  ? 'bg-seller-600 text-white rounded-tr-sm'
-                                  : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'
+                              <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm shadow-premium-sm ${mine
+                                  ? 'bg-seller-600 text-white rounded-tr-none'
+                                  : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
                                 }`}>
                                 <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
                                 <p className={`text-[9px] font-bold text-right mt-1.5 ${mine ? 'text-seller-200' : 'text-gray-400'}`}>
@@ -2485,7 +2722,7 @@ const LandlordDashboard = () => {
                         {/* Typing indicator */}
                         {isChatTyping && (
                           <div className="flex justify-start">
-                            <div className="px-4 py-2.5 rounded-2xl bg-white border border-gray-100 shadow-premium-sm rounded-tl-sm flex items-center gap-1">
+                            <div className="px-4 py-2.5 rounded-2xl bg-white border border-gray-100 shadow-premium-sm rounded-tl-none flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                               <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
                               <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -2495,44 +2732,47 @@ const LandlordDashboard = () => {
                         <div ref={chatEndRef} />
                       </div>
 
-                      {/* Quick replies */}
-                      <div className="px-5 pt-3 pb-1 flex gap-2 overflow-x-auto shrink-0 border-t border-gray-50/50 bg-white">
-                        {['Phòng vẫn còn trống ạ', 'Anh/chị có thể xem phòng chiều nay không?', 'Cảm ơn anh/chị đã liên hệ!'].map(qr => (
-                          <button
-                            key={qr}
-                            onClick={() => setMsgInput(qr)}
-                            className="shrink-0 text-[10.5px] font-bold px-3.5 py-2 bg-gray-50 hover:bg-seller-50 text-gray-650 hover:text-seller-700 rounded-full border border-gray-250 hover:border-seller-300 transition-all whitespace-nowrap cursor-pointer"
-                          >
-                            {qr}
-                          </button>
-                        ))}
-                      </div>
+                      {/* Quick replies & Input Container */}
+                      <div className="border-t border-gray-100 bg-white shrink-0">
+                        {/* Quick replies */}
+                        <div className="px-5 pt-3 pb-1 flex gap-2 overflow-x-auto scrollbar-none">
+                          {['Phòng vẫn còn trống ạ', 'Anh/chị có thể xem phòng chiều nay không?', 'Cảm ơn anh/chị đã liên hệ!'].map(qr => (
+                            <button
+                              key={qr}
+                              onClick={() => setMsgInput(qr)}
+                              className="shrink-0 text-[10.5px] font-bold px-3.5 py-1.5 bg-gray-50 hover:bg-seller-50 text-gray-650 hover:text-seller-700 rounded-full border border-gray-200 hover:border-seller-300 transition-all whitespace-nowrap cursor-pointer"
+                            >
+                              {qr}
+                            </button>
+                          ))}
+                        </div>
 
-                      {/* Input */}
-                      <form onSubmit={handleSendMsg} className="px-5 py-3 border-t border-gray-100 flex gap-2.5 bg-white shrink-0">
-                        <input
-                          type="text"
-                          value={msgInput}
-                          onChange={handleChatTypingInput}
-                          placeholder="Nhập tin nhắn..."
-                          className="flex-grow bg-gray-50 border border-gray-250 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-seller-500 focus:border-seller-500 outline-none transition-all"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!msgInput.trim() || sendingMsg}
-                          className="w-11 h-11 bg-seller-600 hover:bg-seller-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center transition active:scale-95 cursor-pointer shadow-premium-sm shadow-seller-500/10 border-0"
-                        >
-                          {sendingMsg
-                            ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            : <i className="fa-solid fa-paper-plane text-xs" />
-                          }
-                        </button>
-                      </form>
+                        {/* Input */}
+                        <form onSubmit={handleSendMsg} className="px-5 py-3.5 flex gap-2.5 items-center">
+                          <input
+                            type="text"
+                            value={msgInput}
+                            onChange={handleChatTypingInput}
+                            placeholder="Nhập tin nhắn..."
+                            className="flex-grow bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-seller-500 focus:border-seller-500 outline-none transition-all focus:bg-white"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!msgInput.trim() || sendingMsg}
+                            className="w-10 h-10 bg-seller-600 hover:bg-seller-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center transition active:scale-95 cursor-pointer shadow-premium-sm shadow-seller-500/10 border-0"
+                          >
+                            {sendingMsg
+                              ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              : <i className="fa-solid fa-paper-plane text-[11px]" />
+                            }
+                          </button>
+                        </form>
+                      </div>
                     </>
                   ) : (
                     <div className="flex-grow flex flex-col items-center justify-center text-center p-8 text-gray-400">
                       <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-4 shadow-inner">
-                        <i className="fa-solid fa-comment-dots text-2xl text-gray-300" />
+                        <i className="fa-solid fa-comment-dots text-2xl text-gray-300 animate-pulse" />
                       </div>
                       <p className="text-sm font-bold text-gray-800">Chọn một cuộc hội thoại</p>
                       <p className="text-xs text-gray-400 mt-1 max-w-xs leading-relaxed">
@@ -2851,6 +3091,7 @@ const LandlordDashboard = () => {
 
         </main>
       </div>
+    </div>
 
       {/* ─── Property Modal ─── */}
       {propModalOpen && (

@@ -15,6 +15,18 @@
   --color-brand-900: hsl(var(--color-primary-900-hsl));
   --color-brand-950: hsl(var(--color-primary-950-hsl));
 
+  --color-admin-50: hsl(var(--color-admin-50-hsl));
+  --color-admin-100: hsl(var(--color-admin-100-hsl));
+  --color-admin-200: hsl(var(--color-admin-200-hsl));
+  --color-admin-300: hsl(var(--color-admin-300-hsl));
+  --color-admin-400: hsl(var(--color-admin-400-hsl));
+  --color-admin-500: hsl(var(--color-admin-500-hsl));
+  --color-admin-600: hsl(var(--color-admin-600-hsl));
+  --color-admin-700: hsl(var(--color-admin-700-hsl));
+  --color-admin-800: hsl(var(--color-admin-800-hsl));
+  --color-admin-900: hsl(var(--color-admin-900-hsl));
+  --color-admin-950: hsl(var(--color-admin-950-hsl));
+
   --color-seller-50: hsl(var(--color-secondary-50-hsl));
   --color-seller-100: hsl(var(--color-secondary-100-hsl));
   --color-seller-200: hsl(var(--color-secondary-200-hsl));
@@ -138,6 +150,18 @@
     --color-primary-900-hsl: 224, 64%, 33%;   /* #1e3a8a */
     --color-primary-950-hsl: 224, 71%, 19%;   /* #172554 */
 
+    --color-admin-50-hsl: 258, 100%, 97%;   /* #f5f3ff */
+    --color-admin-100-hsl: 258, 96%, 93%;   /* #ede9fe */
+    --color-admin-200-hsl: 258, 95%, 88%;   /* #ddd6fe */
+    --color-admin-300-hsl: 258, 94%, 80%;   /* #c4b5fd */
+    --color-admin-400-hsl: 258, 93%, 71%;   /* #a78bfa */
+    --color-admin-500-hsl: 258, 90%, 66%;   /* #8b5cf6 */
+    --color-admin-600-hsl: 258, 89%, 60%;   /* #7c3aed */
+    --color-admin-700-hsl: 258, 83%, 52%;   /* #6d28d9 */
+    --color-admin-800-hsl: 258, 77%, 44%;   /* #5b21b6 */
+    --color-admin-900-hsl: 258, 73%, 37%;   /* #4c1d95 */
+    --color-admin-950-hsl: 258, 79%, 20%;   /* #2e1065 */
+
     --color-secondary-50-hsl: 152, 81%, 96%;  /* #ecfdf5 */
     --color-secondary-100-hsl: 149, 80%, 90%; /* #d1fae5 */
     --color-secondary-200-hsl: 150, 75%, 80%;
@@ -251,4 +275,12 @@ body {
 
 .hover-glow:hover {
     box-shadow: 0 0 20px 0 rgba(37, 99, 235, 0.35);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
 }

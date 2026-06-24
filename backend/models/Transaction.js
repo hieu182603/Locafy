@@ -64,6 +64,5 @@ const TransactionSchema = new mongoose.Schema(
 );
 
 TransactionSchema.index({ account: 1, status: 1, createdAt: -1 });
-TransactionSchema.index({ orderCode: 1 }, { sparse: true, unique: true });
 
 module.exports = mongoose.model('Transaction', TransactionSchema);
