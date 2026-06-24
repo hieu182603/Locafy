@@ -152,7 +152,8 @@ export const LocafyApi = {
   // Conversations & Messages
   getConversations: () => apiGet('/conversations'),
   getOrCreateConversation: (data) => apiSend('POST', '/conversations', data),
-  getMessages: (conversationId) => apiGet(`/messages/${conversationId}`),
+  markConversationRead: (id) => apiSend('PATCH', `/conversations/${id}/read`, {}),
+  getMessages: (conversationId, params) => apiGet(`/messages/${conversationId}` + (params ? '?' + new URLSearchParams(params).toString() : '')),
   sendMessage: (data) => apiSend('POST', '/messages', data),
 
   // Notifications

@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LocafyApi } from '../../services/api';
 import ListingCard from '../../components/ListingCard';
-import { socket } from '../../services/socket';
+import { socket, initSocket } from '../../services/socket';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1317,18 +1317,22 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [newMsg, setNewMsg] = useState('');
   const [sending, setSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);   // người kia đang gõ
+  const typingTimerRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  const myId = user?._id || user?.id || '';
 
   // Load conversations
   useEffect(() => {
     setLoadingConvs(true);
     LocafyApi.getConversations()
-      .then((data) => setConversations(data || []))
+      .then((res) => setConversations(res.data || []))
       .catch(console.error)
       .finally(() => setLoadingConvs(false));
   }, []);
 
-  // Set active conv from initialChatId
+  // Auto-select from URL param
   useEffect(() => {
     if (initialChatId && conversations.length > 0) {
       const found = conversations.find((c) => c._id === initialChatId);
@@ -1338,52 +1342,86 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
   }, [initialChatId, conversations]);
 
   const selectConversation = useCallback(async (conv) => {
+    // Leave old room
+    if (activeChatId) socket.emit('leave_room', activeChatId);
+
     setActiveChatId(conv._id);
     setActiveConv(conv);
+    setIsTyping(false);
     if (onChatChange) onChatChange(conv._id);
     setLoadingMsgs(true);
     try {
-      const msgs = await LocafyApi.getMessages(conv._id);
-      setMessages(msgs || []);
+      const res = await LocafyApi.getMessages(conv._id);
+      setMessages(res.data || []);
+      // Mark as read
+      LocafyApi.markConversationRead(conv._id).catch(() => {});
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingMsgs(false);
     }
-  }, [onChatChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChatId, onChatChange]);
 
-  // Socket.io: join room & receive messages
+  // Socket: connect once, join/leave rooms as activeChatId changes
   useEffect(() => {
-    if (!activeChatId || !user) return;
-
-    socket.connect();
-    socket.emit('join_room', activeChatId);
-
-    const handleReceiveMessage = (msg) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          _id: msg._id || Date.now(),
-          text: msg.text,
-          senderId: msg.senderId,
-          createdAt: msg.createdAt || new Date().toISOString(),
-          type: msg.type || 'text',
-        },
-      ]);
-    };
-
-    socket.on('receive_message', handleReceiveMessage);
+    if (!user) return;
+    initSocket(localStorage.getItem('locafy_token'));
+    if (!socket.connected) socket.connect();
 
     return () => {
-      socket.off('receive_message', handleReceiveMessage);
-      socket.disconnect();
+      // Don't disconnect — leave is handled in selectConversation
     };
-  }, [activeChatId, user]);
+  }, [user]);
 
-  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (!activeChatId || !user) return;
+    socket.emit('join_room', activeChatId);
+
+    const handleReceive = (msg) => {
+      // Server broadcasts to ALL in room — skip my own messages to avoid duplicate
+      const senderId = msg.sender?._id || msg.sender;
+      if (String(senderId) === String(myId)) return;
+      setMessages((prev) => [...prev, msg]);
+      // Update conversation last message preview
+      setConversations((prev) => prev.map((c) =>
+        c._id === activeChatId
+          ? { ...c, lastMessage: msg.text || '[Hình ảnh]', lastMessageAt: msg.createdAt, unreadByUser: 0 }
+          : c
+      ));
+    };
+
+    const handleTyping = ({ senderId }) => {
+      if (String(senderId) !== String(myId)) setIsTyping(true);
+    };
+    const handleStopTyping = () => setIsTyping(false);
+
+    socket.on('receive_message', handleReceive);
+    socket.on('typing', handleTyping);
+    socket.on('stop_typing', handleStopTyping);
+
+    return () => {
+      socket.off('receive_message', handleReceive);
+      socket.off('typing', handleTyping);
+      socket.off('stop_typing', handleStopTyping);
+    };
+  }, [activeChatId, myId, user]);
+
+  // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isTyping]);
+
+  // Emit typing indicators
+  const handleTypingInput = (e) => {
+    setNewMsg(e.target.value);
+    if (!activeChatId) return;
+    socket.emit('typing', { conversationId: activeChatId });
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      socket.emit('stop_typing', { conversationId: activeChatId });
+    }, 1500);
+  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -1391,16 +1429,20 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
     setSending(true);
     const text = newMsg.trim();
     setNewMsg('');
+    socket.emit('stop_typing', { conversationId: activeChatId });
     try {
-      const sent = await LocafyApi.sendMessage({ conversationId: activeChatId, text, type: 'text' });
-      // The socket will echo back; only add if no socket echo is expected
-      setMessages((prev) => [
-        ...prev,
-        { _id: sent._id || Date.now(), text, senderId: user?._id, createdAt: sent.createdAt || new Date().toISOString(), type: 'text' },
-      ]);
+      const res = await LocafyApi.sendMessage({ conversationId: activeChatId, text, type: 'text' });
+      const saved = res.data;
+      // Add my own message from REST response (socket will NOT re-add because senderId === myId)
+      setMessages((prev) => [...prev, saved]);
+      setConversations((prev) => prev.map((c) =>
+        c._id === activeChatId
+          ? { ...c, lastMessage: text, lastMessageAt: saved.createdAt }
+          : c
+      ));
     } catch (err) {
-      alert('Không gửi được tin nhắn: ' + err.message);
-      setNewMsg(text); // restore
+      alert('Không gửi được tin nhắn: ' + (err.message || ''));
+      setNewMsg(text);
     } finally {
       setSending(false);
     }
@@ -1413,7 +1455,10 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
     }
   };
 
-  const isMine = (msg) => msg.senderId === user?._id;
+  const isMine = (msg) => {
+    const senderId = msg.sender?._id || msg.sender || msg.senderId;
+    return String(senderId) === String(myId);
+  };
 
   return (
     <div>
@@ -1550,6 +1595,19 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
                       );
                     })
                   )}
+                  {/* Typing indicator */}
+                  {isTyping && (
+                    <div className="flex justify-start">
+                      <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold mr-2 self-end shrink-0">
+                        {getInitials(activeConv?.seller?.name)}
+                      </div>
+                      <div className="px-4 py-2.5 rounded-2xl bg-white border border-gray-100 shadow-sm rounded-bl-md flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -1557,7 +1615,7 @@ function ChatsTab({ user, initialChatId, onChatChange }) {
                 <form onSubmit={handleSend} className="px-4 py-3 border-t border-gray-100 bg-white flex gap-2 items-end shrink-0">
                   <textarea
                     value={newMsg}
-                    onChange={(e) => setNewMsg(e.target.value)}
+                    onChange={handleTypingInput}
                     onKeyDown={handleKeyDown}
                     placeholder="Nhập tin nhắn... (Enter để gửi)"
                     rows={1}
